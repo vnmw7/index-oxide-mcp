@@ -1,0 +1,9 @@
+target/
+.git/
+.github/
+.gitignore
+.idea/
+.vscode/
+*.pdb
+*.swp
+.DS_Store

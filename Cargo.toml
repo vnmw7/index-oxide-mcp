@@ -1,0 +1,72 @@
+[package]
+name = "index-oxide-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "High-throughput MCP codebase indexer for agentic AI workflows"
+license = "MIT"
+
+[dependencies]
+# MCP SDK
+rmcp = { version = "1.3", features = ["server", "macros", "transport-streamable-http-server"] }
+schemars = "1.1"
+
+# Web framework (SSE transport)
+axum = "0.8"
+
+# CLI argument parsing
+clap = { version = "4.6", features = ["derive"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Synchronization
+parking_lot = "0.12"
+
+# HTTP client (Gemini API)
+reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
+base64 = "0.22"
+
+# Qdrant vector DB (gRPC)
+qdrant-client = "1.17"
+
+# Tree-sitter parsing
+tree-sitter = "0.26"
+tree-sitter-rust = "0.24"
+tree-sitter-python = "0.25"
+tree-sitter-typescript = "0.23"
+tree-sitter-go = "0.25"
+
+# File walking
+ignore = "0.4"
+glob = "0.3"
+
+# Hashing and IDs
+blake3 = "1.8"
+uuid = { version = "1", features = ["v4", "v5"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Retry / backoff
+rand = "0.10"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+strip = "symbols"

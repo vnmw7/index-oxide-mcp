@@ -1,0 +1,21 @@
+# System: Index Oxide MCP
+# File URL: oxidized-index-mcp/docker-compose.yml
+# Purpose: Qdrant vector database service for code chunk storage and retrieval
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: oxi-qdrant
+    ports:
+      - "6334:6334"  # gRPC - primary ingestion/query port
+      - "6333:6333"  # REST/HTTP - admin/UI convenience only
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__SERVICE__HTTP_PORT=6333
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+    driver: local

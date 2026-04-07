@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Release - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary_name: index-oxide-mcp
+            release_name: index-oxide-mcp-linux
+          - os: macos-latest
+            binary_name: index-oxide-mcp
+            release_name: index-oxide-mcp-macos
+          - os: windows-latest
+            binary_name: index-oxide-mcp.exe
+            release_name: index-oxide-mcp-windows.exe
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Binary
+        run: cargo build --release
+
+      - name: Rename Binary (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: mv target/release/${{ matrix.binary_name }} target/release/${{ matrix.release_name }}
+
+      - name: Rename Binary (Windows)
+        if: runner.os == 'Windows'
+        run: mv target/release/${{ matrix.binary_name }} target/release/${{ matrix.release_name }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: target/release/${{ matrix.release_name }}
+          generate_release_notes: true
