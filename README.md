@@ -137,14 +137,19 @@ Default SSE endpoints:
 - MCP endpoint: `http://localhost:8754/mcp`
 - Health endpoint: `http://localhost:8754/health`
 
-Example MCP client config for SSE mode:
+MCP client config for SSE mode in Kilo Code:
 
 ```json
 {
-  "mcpServers": {
-    "index-oxide": {
-      "url": "http://localhost:8754/mcp"
-    }
+  "index-oxide": {
+    "type": "local", // Change type to local
+    "command": [
+      "npx",
+      "-y",
+      "mcp-remote", 
+      "http://localhost:8754/mcp"
+    ],
+    "enabled": true
   }
 }
 ```
