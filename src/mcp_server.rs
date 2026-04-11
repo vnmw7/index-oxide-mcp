@@ -119,7 +119,7 @@ impl OxiServer {
         let spawn_job_id = job_id.clone();
         tokio::spawn(async move {
             if let Err(e) =
-                crate::pipeline::run_pipeline(config, gemini, qdrant, job, include_globs, exclude_globs, languages)
+                crate::pipeline::run_pipeline(config, gemini, qdrant, job, include_globs, exclude_globs, languages, None)
                     .await
             {
                 error!(job_id = %spawn_job_id, error = %e, "Pipeline failed");

@@ -48,6 +48,8 @@ pub struct CodeChunk {
     pub content_hash: String,
     /// File modification time (ISO 8601)
     pub file_mtime: String,
+    /// Total file size in bytes (for fast refresh checks)
+    pub file_size: u64,
 }
 
 /// A code chunk with its computed embedding vector, ready for indexing.

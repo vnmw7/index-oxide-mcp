@@ -144,15 +144,12 @@ async fn process_file(
         .to_string_lossy()
         .replace('\\', "/"); // Normalize to forward slashes
 
-    // Get file modification time
-    let file_mtime = tokio::fs::metadata(path)
-        .await
-        .ok()
-        .and_then(|m| m.modified().ok())
-        .map(|t| {
-            chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()
-        })
-        .unwrap_or_default();
+    // Get file metadata
+    let metadata = tokio::fs::metadata(path).await?;
+    let file_mtime = metadata.modified().ok().map(|t| {
+        chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()
+    }).unwrap_or_default();
+    let file_size = metadata.len();
 
     // Parse with tree-sitter
     let mut parser = create_parser(language)
@@ -170,6 +167,7 @@ async fn process_file(
         &relative_path,
         repo_name,
         &file_mtime,
+        file_size,
     );
 
     debug!(

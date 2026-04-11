@@ -20,6 +20,7 @@ pub fn extract_chunks(
     path: &str,
     repo: &str,
     file_mtime: &str,
+    file_size: u64,
 ) -> Vec<CodeChunk> {
     let root = tree.root_node();
     let mut chunks = Vec::new();
@@ -37,6 +38,7 @@ pub fn extract_chunks(
             path,
             repo,
             file_mtime,
+            file_size,
             &imports,
             None, // no parent at top level
             &mut chunks,
@@ -70,6 +72,7 @@ pub fn extract_chunks(
             chunk_text: source.to_string(),
             content_hash,
             file_mtime: file_mtime.to_string(),
+            file_size,
         });
     }
 
@@ -84,6 +87,7 @@ fn extract_from_node(
     path: &str,
     repo: &str,
     file_mtime: &str,
+    file_size: u64,
     imports: &str,
     parent_symbol: Option<&str>,
     chunks: &mut Vec<CodeChunk>,
@@ -117,6 +121,7 @@ fn extract_from_node(
                 path,
                 repo,
                 file_mtime,
+                file_size,
                 imports,
                 &symbol_name,
                 &symbol_kind,
@@ -154,6 +159,7 @@ fn extract_from_node(
             chunk_text,
             content_hash,
             file_mtime: file_mtime.to_string(),
+            file_size,
         });
 
         // Recurse into children for nested definitions (e.g. methods in impl/class)
@@ -166,6 +172,7 @@ fn extract_from_node(
                 path,
                 repo,
                 file_mtime,
+                file_size,
                 imports,
                 Some(&symbol_path),
                 chunks,
@@ -182,6 +189,7 @@ fn extract_from_node(
                 path,
                 repo,
                 file_mtime,
+                file_size,
                 imports,
                 parent_symbol,
                 chunks,
@@ -388,6 +396,7 @@ fn split_oversized_node(
     path: &str,
     repo: &str,
     file_mtime: &str,
+    file_size: u64,
     imports: &str,
     parent_name: &str,
     parent_kind: &str,
@@ -436,6 +445,7 @@ fn split_oversized_node(
                 chunk_text: text,
                 content_hash: hash,
                 file_mtime: file_mtime.to_string(),
+                file_size,
             });
         }
     }
@@ -473,6 +483,7 @@ fn split_oversized_node(
                     chunk_text: header_text,
                     content_hash: hash,
                     file_mtime: file_mtime.to_string(),
+                    file_size,
                 });
             }
         }
@@ -514,6 +525,7 @@ fn split_oversized_node(
                 chunk_text: text,
                 content_hash: hash,
                 file_mtime: file_mtime.to_string(),
+                file_size,
             });
         }
     }
@@ -572,6 +584,7 @@ fn greet(name: &str) -> String {
             "src/lib.rs",
             "test",
             "",
+            0,
         );
 
         assert!(!chunks.is_empty());
@@ -596,6 +609,7 @@ struct Config {
             "src/config.rs",
             "test",
             "",
+            0,
         );
 
         let struct_chunk = chunks.iter().find(|c| c.symbol_name == "Config").unwrap();
@@ -623,6 +637,7 @@ impl Config {
             "src/config.rs",
             "test",
             "",
+            0,
         );
 
         // Should find the impl block and its methods

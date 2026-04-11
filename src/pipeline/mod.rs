@@ -30,6 +30,7 @@ pub async fn run_pipeline(
     include_globs: Option<Vec<String>>,
     exclude_globs: Option<Vec<String>>,
     language_filter: Option<Vec<String>>,
+    specific_files: Option<Vec<PathBuf>>,
 ) -> anyhow::Result<()> {
     let collection_name = qdrant.ensure_collection(&job.repo_name).await?;
 
@@ -43,24 +44,38 @@ pub async fn run_pipeline(
 
     let repo_root = PathBuf::from(&job.repo_root);
 
-    // Stage A: Discovery
+    // Stage A: Discovery or Specific Files
     let disc_job = Arc::clone(&job);
     let disc_root = repo_root.clone();
     let disc_include = include_globs.clone();
     let disc_exclude = exclude_globs.clone();
     let discovery_handle = tokio::spawn(async move {
-        disc_job.set_stage(JobStage::Discovering);
-        if let Err(e) = discovery::discover_files(
-            &disc_root,
-            discovery_tx,
-            &disc_job,
-            disc_include,
-            disc_exclude,
-        )
-        .await
-        {
-            error!(error = %e, "Discovery stage failed");
-            disc_job.add_error(format!("Discovery: {}", e));
+        if let Some(files) = specific_files {
+            info!(count = files.len(), "Indexing specific files list");
+            disc_job.set_stage(JobStage::Discovering);
+            for file in files {
+                if disc_job.is_cancelled() {
+                    break;
+                }
+                disc_job.counters.discovered.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if discovery_tx.send(file).await.is_err() {
+                    break;
+                }
+            }
+        } else {
+            disc_job.set_stage(JobStage::Discovering);
+            if let Err(e) = discovery::discover_files(
+                &disc_root,
+                discovery_tx,
+                &disc_job,
+                disc_include,
+                disc_exclude,
+            )
+            .await
+            {
+                error!(error = %e, "Discovery stage failed");
+                disc_job.add_error(format!("Discovery: {}", e));
+            }
         }
     });
 
@@ -88,6 +103,7 @@ pub async fn run_pipeline(
     let embed_job = Arc::clone(&job);
     let embed_config = Arc::clone(&config);
     let embed_gemini = Arc::clone(&gemini);
+    let embed_qdrant = Arc::clone(&qdrant);
     let embed_handle = tokio::spawn(async move {
         embed_job.set_stage(JobStage::Embedding);
         embedder::run_embedder(
@@ -96,6 +112,7 @@ pub async fn run_pipeline(
             &embed_job,
             &embed_config,
             &embed_gemini,
+            &embed_qdrant,
         )
         .await;
     });
