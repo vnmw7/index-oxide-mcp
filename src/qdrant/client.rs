@@ -12,7 +12,7 @@ use qdrant_client::qdrant::{
     CreateCollectionBuilder, Distance, FieldType, Filter, HnswConfigDiffBuilder,
     PointStruct, QueryPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
     Condition, CreateFieldIndexCollectionBuilder,
-    PointsSelector, ScrollPointsBuilder, PayloadIncludeSelector,
+    PointsSelector, ScrollPointsBuilder, PayloadIncludeSelector, Vector,
 };
 use qdrant_client::Qdrant;
 use serde_json::json;
@@ -371,7 +371,9 @@ impl OxiQdrantClient {
                 if let Some(hash) = hash_val.as_str() {
                     if let Some(vectors) = point.vectors {
                         if let Some(qdrant_client::qdrant::vectors_output::VectorsOptions::Vector(v)) = vectors.vectors_options {
-                            result.insert(hash.to_string(), v.data);
+                            if let Some(Vector::Dense(dense)) = v.into_vector() {
+                                result.insert(hash.to_string(), dense.data);
+                            }
                         }
                     }
                 }
