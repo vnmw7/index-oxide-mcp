@@ -55,10 +55,10 @@ pub async fn discover_files(
     let walk_handle = tokio::task::spawn_blocking(move || {
         let mut builder = WalkBuilder::new(&root_owned);
         builder
-            .hidden(true)         // skip hidden files
-            .git_ignore(true)     // respect .gitignore
-            .git_global(true)     // respect global gitignore
-            .git_exclude(true);   // respect .git/info/exclude
+            .hidden(true) // skip hidden files
+            .git_ignore(true) // respect .gitignore
+            .git_global(true) // respect global gitignore
+            .git_exclude(true); // respect .git/info/exclude
 
         let walker = builder.build();
 

@@ -117,7 +117,11 @@ pub async fn search_codebase(
         .collect();
 
     // Sort by adjusted score descending
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Truncate to requested limit
     results.truncate(limit as usize);

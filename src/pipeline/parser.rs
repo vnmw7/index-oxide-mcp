@@ -79,7 +79,9 @@ pub async fn run_parser_workers(
                     Ok(chunks) => {
                         job.counters.parsed.fetch_add(1, Ordering::Relaxed);
                         let chunk_count = chunks.len() as u64;
-                        job.counters.chunked.fetch_add(chunk_count, Ordering::Relaxed);
+                        job.counters
+                            .chunked
+                            .fetch_add(chunk_count, Ordering::Relaxed);
 
                         for chunk in chunks {
                             if tx.send(chunk).await.is_err() {
@@ -119,8 +121,7 @@ async fn process_file(
     language_filter: &Option<Vec<String>>,
 ) -> anyhow::Result<Vec<CodeChunk>> {
     // Detect language
-    let language = detect_language(path)
-        .ok_or_else(|| anyhow::anyhow!("Unsupported language"))?;
+    let language = detect_language(path).ok_or_else(|| anyhow::anyhow!("Unsupported language"))?;
 
     // Apply language filter
     if !is_language_allowed(&language, language_filter) {
@@ -129,8 +130,8 @@ async fn process_file(
 
     // Read file content
     let content = tokio::fs::read(path).await?;
-    let source = String::from_utf8(content)
-        .map_err(|e| anyhow::anyhow!("UTF-8 decode error: {}", e))?;
+    let source =
+        String::from_utf8(content).map_err(|e| anyhow::anyhow!("UTF-8 decode error: {}", e))?;
 
     // Skip empty files
     if source.trim().is_empty() {
@@ -146,9 +147,11 @@ async fn process_file(
 
     // Get file metadata
     let metadata = tokio::fs::metadata(path).await?;
-    let file_mtime = metadata.modified().ok().map(|t| {
-        chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()
-    }).unwrap_or_default();
+    let file_mtime = metadata
+        .modified()
+        .ok()
+        .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339())
+        .unwrap_or_default();
     let file_size = metadata.len();
 
     // Parse with tree-sitter

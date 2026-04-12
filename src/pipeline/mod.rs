@@ -37,8 +37,7 @@ pub async fn run_pipeline(
     // Create bounded channels between pipeline stages
     let (discovery_tx, discovery_rx) =
         mpsc::channel::<PathBuf>(config.pipeline.discovery_channel_size);
-    let (chunk_tx, chunk_rx) =
-        mpsc::channel::<CodeChunk>(config.pipeline.parser_channel_size);
+    let (chunk_tx, chunk_rx) = mpsc::channel::<CodeChunk>(config.pipeline.parser_channel_size);
     let (embedded_tx, embedded_rx) =
         mpsc::channel::<EmbeddedChunk>(config.pipeline.embedder_channel_size);
 
@@ -57,7 +56,10 @@ pub async fn run_pipeline(
                 if disc_job.is_cancelled() {
                     break;
                 }
-                disc_job.counters.discovered.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                disc_job
+                    .counters
+                    .discovered
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if discovery_tx.send(file).await.is_err() {
                     break;
                 }

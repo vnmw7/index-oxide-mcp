@@ -109,8 +109,14 @@ pub async fn refresh_index(
         })
     });
 
-    let current_files = Arc::try_unwrap(current_files).unwrap().into_inner().unwrap();
-    let changed_files_vec = Arc::try_unwrap(changed_files).unwrap().into_inner().unwrap();
+    let current_files = Arc::try_unwrap(current_files)
+        .unwrap()
+        .into_inner()
+        .unwrap();
+    let changed_files_vec = Arc::try_unwrap(changed_files)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     // Detect deleted files
     let deleted_files: Vec<String> = indexed_metadata_arc
@@ -123,7 +129,11 @@ pub async fn refresh_index(
     let added = changed_files_vec
         .iter()
         .filter(|p| {
-            let rel = p.strip_prefix(root_path).unwrap_or(p).to_string_lossy().replace('\\', "/");
+            let rel = p
+                .strip_prefix(root_path)
+                .unwrap_or(p)
+                .to_string_lossy()
+                .replace('\\', "/");
             !indexed_metadata_arc.contains_key(&rel)
         })
         .count() as u64;
@@ -151,7 +161,10 @@ pub async fn refresh_index(
             .unwrap_or(path_buf)
             .to_string_lossy()
             .replace('\\', "/");
-        if let Err(e) = qdrant.delete_by_path(&collection_name, &relative_path).await {
+        if let Err(e) = qdrant
+            .delete_by_path(&collection_name, &relative_path)
+            .await
+        {
             warn!(path = %relative_path, error = %e, "Failed to delete chunks for changed file");
         }
     }
@@ -159,7 +172,7 @@ pub async fn refresh_index(
     // Re-index changed files through the specific_files pipeline
     if !changed_files_vec.is_empty() {
         info!(count = changed_files_vec.len(), "Re-indexing changed files");
-        
+
         let job = crate::models::job::IndexJob::new(
             format!("refresh-{}", uuid::Uuid::new_v4()),
             root_path.to_string_lossy().to_string(),

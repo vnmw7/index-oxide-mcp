@@ -117,7 +117,10 @@ async fn process_batch(
 
     // 1. Check Cache: Try to find existing embeddings by content_hash
     let hashes: Vec<String> = batch.iter().map(|c| c.content_hash.clone()).collect();
-    let cached_embeddings = match qdrant.get_embeddings_by_hashes(collection_name, &hashes).await {
+    let cached_embeddings = match qdrant
+        .get_embeddings_by_hashes(collection_name, &hashes)
+        .await
+    {
         Ok(map) => map,
         Err(e) => {
             warn!(error = %e, "Failed to fetch cached embeddings, proceeding with full batch");
@@ -159,9 +162,15 @@ async fn process_batch(
             })
             .collect();
 
-        match gemini.embed_batch(&inputs, "RETRIEVAL_DOCUMENT", max_retries).await {
+        match gemini
+            .embed_batch(&inputs, "RETRIEVAL_DOCUMENT", max_retries)
+            .await
+        {
             Ok(embed_result) => {
-                for (chunk, embedding) in to_embed.into_iter().zip(embed_result.embeddings.into_iter()) {
+                for (chunk, embedding) in to_embed
+                    .into_iter()
+                    .zip(embed_result.embeddings.into_iter())
+                {
                     results.push(EmbeddedChunk {
                         chunk,
                         embedding,
@@ -173,8 +182,13 @@ async fn process_batch(
             }
             Err(e) => {
                 error!(count = cache_misses, error = %e, "Embedding batch failed");
-                job.counters.failed.fetch_add(cache_misses as u64, Ordering::Relaxed);
-                job.add_error(format!("Embedding failed for {} chunks: {}", cache_misses, e));
+                job.counters
+                    .failed
+                    .fetch_add(cache_misses as u64, Ordering::Relaxed);
+                job.add_error(format!(
+                    "Embedding failed for {} chunks: {}",
+                    cache_misses, e
+                ));
                 // We still send the cached ones though
             }
         }

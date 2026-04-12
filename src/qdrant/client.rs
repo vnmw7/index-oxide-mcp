@@ -9,10 +9,9 @@ use crate::errors::StorageError;
 use crate::models::chunk::EmbeddedChunk;
 use crate::util::hashing::{build_collection_name, generate_chunk_id};
 use qdrant_client::qdrant::{
-    CreateCollectionBuilder, Distance, FieldType, Filter, HnswConfigDiffBuilder,
-    PointStruct, QueryPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
-    Condition, CreateFieldIndexCollectionBuilder,
-    PointsSelector, ScrollPointsBuilder, PayloadIncludeSelector, Vector,
+    Condition, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder, Distance, FieldType,
+    Filter, HnswConfigDiffBuilder, PayloadIncludeSelector, PointStruct, PointsSelector,
+    QueryPointsBuilder, ScrollPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
 };
 use qdrant_client::Qdrant;
 use serde_json::json;
@@ -80,13 +79,11 @@ impl OxiQdrantClient {
         for (field, field_type) in indexed_fields {
             if let Err(e) = self
                 .client
-                .create_field_index(
-                    CreateFieldIndexCollectionBuilder::new(
-                        &collection_name,
-                        field,
-                        field_type,
-                    ),
-                )
+                .create_field_index(CreateFieldIndexCollectionBuilder::new(
+                    &collection_name,
+                    field,
+                    field_type,
+                ))
                 .await
             {
                 warn!(field, collection = %collection_name, error = %e, "Failed to create field index (non-fatal)");
@@ -234,14 +231,12 @@ impl OxiQdrantClient {
         let filter = Filter::must(vec![Condition::matches("path", path.to_string())]);
 
         self.client
-            .delete_points(
-                qdrant_client::qdrant::DeletePoints {
-                    collection_name: collection_name.to_string(),
-                    points: Some(PointsSelector::from(filter)),
-                    wait: Some(true),
-                    ..Default::default()
-                }
-            )
+            .delete_points(qdrant_client::qdrant::DeletePoints {
+                collection_name: collection_name.to_string(),
+                points: Some(PointsSelector::from(filter)),
+                wait: Some(true),
+                ..Default::default()
+            })
             .await
             .map_err(|e| StorageError::DeleteFailed(e.to_string()))?;
 
@@ -315,14 +310,15 @@ impl OxiQdrantClient {
                     payload.get("file_size"),
                     payload.get("content_hash"),
                 ) {
-                    if let (Some(path), Some(mtime), Some(hash)) = (
-                        path_val.as_str(),
-                        mtime_val.as_str(),
-                        hash_val.as_str(),
-                    ) {
+                    if let (Some(path), Some(mtime), Some(hash)) =
+                        (path_val.as_str(), mtime_val.as_str(), hash_val.as_str())
+                    {
                         let size = size_val.as_integer().unwrap_or(0) as u64;
                         // Use the last seen one (should be consistent per file)
-                        result.insert(path.to_string(), (mtime.to_string(), size, hash.to_string()));
+                        result.insert(
+                            path.to_string(),
+                            (mtime.to_string(), size, hash.to_string()),
+                        );
                     }
                 }
             }
@@ -370,9 +366,17 @@ impl OxiQdrantClient {
             if let Some(hash_val) = point.payload.get("content_hash") {
                 if let Some(hash) = hash_val.as_str() {
                     if let Some(vectors) = point.vectors {
-                        if let Some(qdrant_client::qdrant::vectors_output::VectorsOptions::Vector(v)) = vectors.vectors_options {
-                            if let Some(Vector::Dense(dense)) = v.into_vector() {
-                                result.insert(hash.to_string(), dense.data);
+                        if let Some(
+                            qdrant_client::qdrant::vectors_output::VectorsOptions::Vector(v),
+                        ) = vectors.vectors_options
+                        {
+                            match v.into_vector() {
+                                qdrant_client::qdrant::vector_output::Vector::Dense(dense) => {
+                                    result.insert(hash.to_string(), dense.data);
+                                }
+                                _ => {
+                                    debug!(hash = %hash, "Ignored non-dense vector during cache hydration");
+                                }
                             }
                         }
                     }

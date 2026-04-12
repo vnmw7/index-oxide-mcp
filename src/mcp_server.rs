@@ -9,15 +9,15 @@ use crate::gemini::client::GeminiClient;
 use crate::jobs::registry::JobRegistry;
 use crate::models::job::IndexJob;
 use crate::models::search::{
-    CancelRequest, ClearRepoRequest, IndexRequest, ListReposRequest,
-    RefreshRequest, SearchRequest, StatusRequest,
+    CancelRequest, ClearRepoRequest, IndexRequest, ListReposRequest, RefreshRequest, SearchRequest,
+    StatusRequest,
 };
 use crate::qdrant::client::OxiQdrantClient;
 use crate::search::retriever;
 use crate::util::hashing::sanitize_repo_name;
 use rmcp::{
-    tool, tool_handler, tool_router, ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
+    tool, tool_handler, tool_router, ServerHandler,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -56,11 +56,10 @@ impl ServerHandler for OxiServer {}
 impl OxiServer {
     /// Index a code repository for semantic search.
     /// Spawns an async pipeline that discovers, parses, embeds, and indexes code chunks.
-    #[tool(description = "Index a code repository for semantic search. Spawns an async pipeline that discovers, parses, embeds, and indexes code chunks. Returns a job ID for tracking progress.")]
-    pub async fn index_repository(
-        &self,
-        Parameters(request): Parameters<IndexRequest>,
-    ) -> String {
+    #[tool(
+        description = "Index a code repository for semantic search. Spawns an async pipeline that discovers, parses, embeds, and indexes code chunks. Returns a job ID for tracking progress."
+    )]
+    pub async fn index_repository(&self, Parameters(request): Parameters<IndexRequest>) -> String {
         info!(root_path = %request.root_path, "index_repository called");
 
         let mut actual_root_path = request.root_path.clone();
@@ -118,9 +117,17 @@ impl OxiServer {
 
         let spawn_job_id = job_id.clone();
         tokio::spawn(async move {
-            if let Err(e) =
-                crate::pipeline::run_pipeline(config, gemini, qdrant, job, include_globs, exclude_globs, languages, None)
-                    .await
+            if let Err(e) = crate::pipeline::run_pipeline(
+                config,
+                gemini,
+                qdrant,
+                job,
+                include_globs,
+                exclude_globs,
+                languages,
+                None,
+            )
+            .await
             {
                 error!(job_id = %spawn_job_id, error = %e, "Pipeline failed");
             }
@@ -135,17 +142,15 @@ impl OxiServer {
     }
 
     /// Search indexed codebases using semantic similarity with optional filters.
-    #[tool(description = "Search indexed codebases using semantic similarity. Supports filtering by language, path prefix, symbol kind, and repository. Returns ranked code snippets with full provenance metadata.")]
-    pub async fn search_codebase(
-        &self,
-        Parameters(request): Parameters<SearchRequest>,
-    ) -> String {
+    #[tool(
+        description = "Search indexed codebases using semantic similarity. Supports filtering by language, path prefix, symbol kind, and repository. Returns ranked code snippets with full provenance metadata."
+    )]
+    pub async fn search_codebase(&self, Parameters(request): Parameters<SearchRequest>) -> String {
         info!(query = %request.query, "search_codebase called");
 
         match retriever::search_codebase(&request, &self.gemini, &self.qdrant).await {
-            Ok(response) => serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
-                serde_json::json!({"error": e.to_string()}).to_string()
-            }),
+            Ok(response) => serde_json::to_string_pretty(&response)
+                .unwrap_or_else(|e| serde_json::json!({"error": e.to_string()}).to_string()),
             Err(e) => {
                 error!(error = %e, "Search failed");
                 serde_json::json!({"error": e.to_string()}).to_string()
@@ -154,11 +159,10 @@ impl OxiServer {
     }
 
     /// Refresh a previously indexed repository, re-indexing only changed files.
-    #[tool(description = "Refresh a previously indexed repository. Compares current files against indexed state, re-indexes only changed files, and removes deleted file chunks. Returns a summary of changes.")]
-    pub async fn refresh_index(
-        &self,
-        Parameters(request): Parameters<RefreshRequest>,
-    ) -> String {
+    #[tool(
+        description = "Refresh a previously indexed repository. Compares current files against indexed state, re-indexes only changed files, and removes deleted file chunks. Returns a summary of changes."
+    )]
+    pub async fn refresh_index(&self, Parameters(request): Parameters<RefreshRequest>) -> String {
         info!(root_path = %request.root_path, "refresh_index called");
 
         let root = PathBuf::from(&request.root_path);
@@ -175,9 +179,8 @@ impl OxiServer {
         )
         .await
         {
-            Ok(response) => serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
-                serde_json::json!({"error": e.to_string()}).to_string()
-            }),
+            Ok(response) => serde_json::to_string_pretty(&response)
+                .unwrap_or_else(|e| serde_json::json!({"error": e.to_string()}).to_string()),
             Err(e) => {
                 error!(error = %e, "Refresh failed");
                 serde_json::json!({"error": e.to_string()}).to_string()
@@ -186,11 +189,10 @@ impl OxiServer {
     }
 
     /// Get the status of an indexing job.
-    #[tool(description = "Get the current status of an indexing job, including progress counters and stage information.")]
-    pub async fn get_index_status(
-        &self,
-        Parameters(request): Parameters<StatusRequest>,
-    ) -> String {
+    #[tool(
+        description = "Get the current status of an indexing job, including progress counters and stage information."
+    )]
+    pub async fn get_index_status(&self, Parameters(request): Parameters<StatusRequest>) -> String {
         match self.jobs.get_status(&request.job_id) {
             Some(status) => serde_json::to_string_pretty(&status).unwrap_or_default(),
             None => serde_json::json!({"error": "Job not found"}).to_string(),
@@ -198,11 +200,10 @@ impl OxiServer {
     }
 
     /// Cancel a running indexing job.
-    #[tool(description = "Cancel a running indexing job. The pipeline will stop processing new items and complete the current batch.")]
-    pub async fn cancel_index_job(
-        &self,
-        Parameters(request): Parameters<CancelRequest>,
-    ) -> String {
+    #[tool(
+        description = "Cancel a running indexing job. The pipeline will stop processing new items and complete the current batch."
+    )]
+    pub async fn cancel_index_job(&self, Parameters(request): Parameters<CancelRequest>) -> String {
         if self.jobs.cancel_job(&request.job_id) {
             info!(job_id = %request.job_id, "Job cancelled");
             serde_json::json!({"status": "cancelled", "job_id": request.job_id}).to_string()
@@ -212,7 +213,9 @@ impl OxiServer {
     }
 
     /// Clear the entire index for a specific repository.
-    #[tool(description = "Clear the entire index for a specific repository. Deletes the per-repo collection from Qdrant.")]
+    #[tool(
+        description = "Clear the entire index for a specific repository. Deletes the per-repo collection from Qdrant."
+    )]
     pub async fn clear_repo_index(
         &self,
         Parameters(request): Parameters<ClearRepoRequest>,
@@ -231,7 +234,9 @@ impl OxiServer {
     }
 
     /// List all indexed repositories.
-    #[tool(description = "List all repositories that have been indexed. Returns collection names and their repo identifiers.")]
+    #[tool(
+        description = "List all repositories that have been indexed. Returns collection names and their repo identifiers."
+    )]
     pub async fn list_indexed_repositories(
         &self,
         Parameters(_request): Parameters<ListReposRequest>,
