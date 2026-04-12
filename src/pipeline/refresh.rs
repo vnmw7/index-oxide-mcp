@@ -184,10 +184,10 @@ pub async fn refresh_index(
             gemini.clone(),
             qdrant.clone(),
             job,
-            None,
-            None,
-            None,
-            Some(changed_files_vec),
+            crate::pipeline::PipelineOptions {
+                specific_files: Some(changed_files_vec),
+                ..Default::default()
+            },
         )
         .await?;
     }

@@ -44,7 +44,7 @@ pub async fn search_codebase(
     // Step 4: Convert to search results with deterministic reranking
     let mut results: Vec<SearchResult> = scored_points
         .into_iter()
-        .filter_map(|point| {
+        .map(|point| {
             let payload = &point.payload;
 
             let score = point.score;
@@ -99,7 +99,7 @@ pub async fn search_codebase(
                 }
             }
 
-            Some(SearchResult {
+            SearchResult {
                 score: adjusted_score,
                 repo: repo_val,
                 path,
@@ -112,7 +112,7 @@ pub async fn search_codebase(
                 signature,
                 doc_comment,
                 snippet,
-            })
+            }
         })
         .collect();
 

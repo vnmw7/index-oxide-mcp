@@ -21,16 +21,22 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{error, info};
 
+/// Options for filtering and targeting the indexing pipeline.
+#[derive(Debug, Default, Clone)]
+pub struct PipelineOptions {
+    pub include_globs: Option<Vec<String>>,
+    pub exclude_globs: Option<Vec<String>>,
+    pub language_filter: Option<Vec<String>>,
+    pub specific_files: Option<Vec<PathBuf>>,
+}
+
 /// Run the full indexing pipeline for a repository.
 pub async fn run_pipeline(
     config: Arc<OxiConfig>,
     gemini: Arc<GeminiClient>,
     qdrant: Arc<OxiQdrantClient>,
     job: Arc<IndexJob>,
-    include_globs: Option<Vec<String>>,
-    exclude_globs: Option<Vec<String>>,
-    language_filter: Option<Vec<String>>,
-    specific_files: Option<Vec<PathBuf>>,
+    options: PipelineOptions,
 ) -> anyhow::Result<()> {
     let collection_name = qdrant.ensure_collection(&job.repo_name).await?;
 
@@ -45,11 +51,12 @@ pub async fn run_pipeline(
 
     // Stage A: Discovery or Specific Files
     let disc_job = Arc::clone(&job);
+    let disc_config = Arc::clone(&config);
     let disc_root = repo_root.clone();
-    let disc_include = include_globs.clone();
-    let disc_exclude = exclude_globs.clone();
+    let disc_include = options.include_globs.clone();
+    let disc_exclude = options.exclude_globs.clone();
     let discovery_handle = tokio::spawn(async move {
-        if let Some(files) = specific_files {
+        if let Some(files) = options.specific_files {
             info!(count = files.len(), "Indexing specific files list");
             disc_job.set_stage(JobStage::Discovering);
             for file in files {
@@ -70,6 +77,7 @@ pub async fn run_pipeline(
                 &disc_root,
                 discovery_tx,
                 &disc_job,
+                &disc_config,
                 disc_include,
                 disc_exclude,
             )
@@ -84,7 +92,7 @@ pub async fn run_pipeline(
     // Stage B: Parse + Extract (multiple workers)
     let parser_job = Arc::clone(&job);
     let parser_config = Arc::clone(&config);
-    let parser_lang_filter = language_filter.clone();
+    let parser_lang_filter = options.language_filter.clone();
     let parser_repo = job.repo_name.clone();
     let parser_root = repo_root.clone();
     let parse_handle = tokio::spawn(async move {

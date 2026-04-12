@@ -9,6 +9,17 @@ use crate::util::hashing::compute_content_hash;
 use crate::util::language::SupportedLanguage;
 use tree_sitter::{Node, Tree};
 
+/// Metadata context for the file being processed.
+struct FileContext<'a> {
+    source: &'a str,
+    language: SupportedLanguage,
+    path: &'a str,
+    repo: &'a str,
+    file_mtime: &'a str,
+    file_size: u64,
+    imports: &'a str,
+}
+
 /// Maximum chunk text length before attempting a sub-split (~16KB).
 const MAX_CHUNK_SIZE: usize = 16_384;
 
@@ -28,18 +39,22 @@ pub fn extract_chunks(
     // Extract file-level imports once
     let imports = extract_imports(&root, source, language);
 
+    let ctx = FileContext {
+        source,
+        language,
+        path,
+        repo,
+        file_mtime,
+        file_size,
+        imports: &imports,
+    };
+
     // Walk top-level definitions
     let mut cursor = root.walk();
     for child in root.children(&mut cursor) {
         extract_from_node(
             &child,
-            source,
-            language,
-            path,
-            repo,
-            file_mtime,
-            file_size,
-            &imports,
+            &ctx,
             None, // no parent at top level
             &mut chunks,
         );
@@ -82,65 +97,51 @@ pub fn extract_chunks(
 /// Recursively extract chunks from an AST node if it matches a definition kind.
 fn extract_from_node(
     node: &Node,
-    source: &str,
-    language: SupportedLanguage,
-    path: &str,
-    repo: &str,
-    file_mtime: &str,
-    file_size: u64,
-    imports: &str,
+    ctx: &FileContext,
     parent_symbol: Option<&str>,
     chunks: &mut Vec<CodeChunk>,
 ) {
     let kind = node.kind();
 
-    if is_definition_node(kind, language) {
-        let symbol_name =
-            extract_symbol_name(node, source, language).unwrap_or_else(|| "anonymous".to_string());
+    if is_definition_node(kind, ctx.language) {
+        let symbol_name = extract_symbol_name(node, ctx.source, ctx.language)
+            .unwrap_or_else(|| "anonymous".to_string());
 
-        let symbol_kind = normalize_symbol_kind(kind, language);
+        let symbol_kind = normalize_symbol_kind(kind, ctx.language);
 
         let symbol_path = match parent_symbol {
             Some(parent) => format!("{}::{}", parent, symbol_name),
             None => symbol_name.clone(),
         };
 
-        let doc_comment = extract_doc_comment(node, source, language);
-        let signature = extract_signature(node, source, language);
+        let doc_comment = extract_doc_comment(node, ctx.source, ctx.language);
+        let signature = extract_signature(node, ctx.source, ctx.language);
 
         let start_byte = node.start_byte();
         let end_byte = node.end_byte();
-        let chunk_text = source[start_byte..end_byte].to_string();
+        let chunk_text = ctx.source[start_byte..end_byte].to_string();
 
         // Handle oversized chunks by splitting at secondary AST boundaries
         if chunk_text.len() > MAX_CHUNK_SIZE {
-            split_oversized_node(
-                node,
-                source,
-                language,
-                path,
-                repo,
-                file_mtime,
-                file_size,
-                imports,
-                &symbol_name,
-                &symbol_kind,
-                &symbol_path,
-                &doc_comment,
-                &signature,
-                chunks,
-            );
+            let parent = ParentMetadata {
+                name: &symbol_name,
+                kind: &symbol_kind,
+                path: &symbol_path,
+                doc_comment: &doc_comment,
+                signature: &signature,
+            };
+            split_oversized_node(node, ctx, &parent, chunks);
             return;
         }
 
         let content_hash = compute_content_hash(&chunk_text);
 
         chunks.push(CodeChunk {
-            repo: repo.to_string(),
+            repo: ctx.repo.to_string(),
             branch: None,
             commit_sha: None,
-            path: path.to_string(),
-            language: language.as_str().to_string(),
+            path: ctx.path.to_string(),
+            language: ctx.language.as_str().to_string(),
             symbol_name,
             symbol_kind,
             symbol_path: symbol_path.clone(),
@@ -149,51 +150,29 @@ fn extract_from_node(
             line_end: node.end_position().row as u32 + 1,
             byte_start: start_byte as u32,
             byte_end: end_byte as u32,
-            imports: if imports.is_empty() {
+            imports: if ctx.imports.is_empty() {
                 None
             } else {
-                Some(imports.to_string())
+                Some(ctx.imports.to_string())
             },
             signature,
             doc_comment,
             chunk_text,
             content_hash,
-            file_mtime: file_mtime.to_string(),
-            file_size,
+            file_mtime: ctx.file_mtime.to_string(),
+            file_size: ctx.file_size,
         });
 
         // Recurse into children for nested definitions (e.g. methods in impl/class)
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            extract_from_node(
-                &child,
-                source,
-                language,
-                path,
-                repo,
-                file_mtime,
-                file_size,
-                imports,
-                Some(&symbol_path),
-                chunks,
-            );
+            extract_from_node(&child, ctx, Some(&symbol_path), chunks);
         }
     } else {
         // Not a definition node — recurse to find definitions inside
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            extract_from_node(
-                &child,
-                source,
-                language,
-                path,
-                repo,
-                file_mtime,
-                file_size,
-                imports,
-                parent_symbol,
-                chunks,
-            );
+            extract_from_node(&child, ctx, parent_symbol, chunks);
         }
     }
 }
@@ -388,21 +367,20 @@ fn extract_imports(root: &Node, source: &str, language: SupportedLanguage) -> St
     imports.join("\n")
 }
 
+/// Metadata context for the parent node during recursive chunking.
+struct ParentMetadata<'a> {
+    name: &'a str,
+    kind: &'a str,
+    path: &'a str,
+    doc_comment: &'a Option<String>,
+    signature: &'a Option<String>,
+}
+
 /// Split an oversized definition node at secondary AST boundaries.
 fn split_oversized_node(
     node: &Node,
-    source: &str,
-    language: SupportedLanguage,
-    path: &str,
-    repo: &str,
-    file_mtime: &str,
-    file_size: u64,
-    imports: &str,
-    parent_name: &str,
-    parent_kind: &str,
-    parent_path: &str,
-    doc_comment: &Option<String>,
-    signature: &Option<String>,
+    ctx: &FileContext,
+    parent: &ParentMetadata,
     chunks: &mut Vec<CodeChunk>,
 ) {
     // Try to split at child definition boundaries
@@ -410,42 +388,42 @@ fn split_oversized_node(
     let mut cursor = node.walk();
 
     for child in node.children(&mut cursor) {
-        if is_definition_node(child.kind(), language) {
-            let child_name = extract_symbol_name(&child, source, language)
+        if is_definition_node(child.kind(), ctx.language) {
+            let child_name = extract_symbol_name(&child, ctx.source, ctx.language)
                 .unwrap_or_else(|| "anonymous".to_string());
-            let child_kind = normalize_symbol_kind(child.kind(), language);
-            let child_path = format!("{}::{}", parent_path, child_name);
+            let child_kind = normalize_symbol_kind(child.kind(), ctx.language);
+            let child_path = format!("{}::{}", parent.path, child_name);
 
             let start = child.start_byte();
             let end = child.end_byte();
-            let text = source[start..end].to_string();
+            let text = ctx.source[start..end].to_string();
             let hash = compute_content_hash(&text);
 
             child_chunks.push(CodeChunk {
-                repo: repo.to_string(),
+                repo: ctx.repo.to_string(),
                 branch: None,
                 commit_sha: None,
-                path: path.to_string(),
-                language: language.as_str().to_string(),
+                path: ctx.path.to_string(),
+                language: ctx.language.as_str().to_string(),
                 symbol_name: child_name,
                 symbol_kind: child_kind,
                 symbol_path: child_path,
-                parent_symbol: Some(parent_path.to_string()),
+                parent_symbol: Some(parent.path.to_string()),
                 line_start: child.start_position().row as u32 + 1,
                 line_end: child.end_position().row as u32 + 1,
                 byte_start: start as u32,
                 byte_end: end as u32,
-                imports: if imports.is_empty() {
+                imports: if ctx.imports.is_empty() {
                     None
                 } else {
-                    Some(imports.to_string())
+                    Some(ctx.imports.to_string())
                 },
-                signature: extract_signature(&child, source, language),
-                doc_comment: extract_doc_comment(&child, source, language),
+                signature: extract_signature(&child, ctx.source, ctx.language),
+                doc_comment: extract_doc_comment(&child, ctx.source, ctx.language),
                 chunk_text: text,
                 content_hash: hash,
-                file_mtime: file_mtime.to_string(),
-                file_size,
+                file_mtime: ctx.file_mtime.to_string(),
+                file_size: ctx.file_size,
             });
         }
     }
@@ -454,36 +432,36 @@ fn split_oversized_node(
         // Also add the parent definition header (up to first child) as context chunk
         let first_child_start = child_chunks.first().map(|c| c.byte_start).unwrap_or(0);
         if first_child_start > node.start_byte() as u32 {
-            let header_text = source[node.start_byte()..first_child_start as usize]
+            let header_text = ctx.source[node.start_byte()..first_child_start as usize]
                 .trim()
                 .to_string();
             if !header_text.is_empty() {
                 let hash = compute_content_hash(&header_text);
                 chunks.push(CodeChunk {
-                    repo: repo.to_string(),
+                    repo: ctx.repo.to_string(),
                     branch: None,
                     commit_sha: None,
-                    path: path.to_string(),
-                    language: language.as_str().to_string(),
-                    symbol_name: parent_name.to_string(),
-                    symbol_kind: format!("{}_header", parent_kind),
-                    symbol_path: format!("{}::__header__", parent_path),
+                    path: ctx.path.to_string(),
+                    language: ctx.language.as_str().to_string(),
+                    symbol_name: parent.name.to_string(),
+                    symbol_kind: format!("{}_header", parent.kind),
+                    symbol_path: format!("{}::__header__", parent.path),
                     parent_symbol: None,
                     line_start: node.start_position().row as u32 + 1,
                     line_end: (node.start_position().row + header_text.lines().count()) as u32,
                     byte_start: node.start_byte() as u32,
                     byte_end: first_child_start,
-                    imports: if imports.is_empty() {
+                    imports: if ctx.imports.is_empty() {
                         None
                     } else {
-                        Some(imports.to_string())
+                        Some(ctx.imports.to_string())
                     },
-                    signature: signature.clone(),
-                    doc_comment: doc_comment.clone(),
+                    signature: parent.signature.clone(),
+                    doc_comment: parent.doc_comment.clone(),
                     chunk_text: header_text,
                     content_hash: hash,
-                    file_mtime: file_mtime.to_string(),
-                    file_size,
+                    file_mtime: ctx.file_mtime.to_string(),
+                    file_size: ctx.file_size,
                 });
             }
         }
@@ -491,7 +469,7 @@ fn split_oversized_node(
         chunks.extend(child_chunks);
     } else {
         // No child definitions found — fall back to byte-range splitting with context
-        let full_text = source[node.start_byte()..node.end_byte()].to_string();
+        let full_text = ctx.source[node.start_byte()..node.end_byte()].to_string();
         let lines: Vec<&str> = full_text.lines().collect();
         let lines_per_chunk = 200;
 
@@ -502,30 +480,38 @@ fn split_oversized_node(
                 node.start_position().row as u32 + 1 + (idx * lines_per_chunk) as u32;
 
             chunks.push(CodeChunk {
-                repo: repo.to_string(),
+                repo: ctx.repo.to_string(),
                 branch: None,
                 commit_sha: None,
-                path: path.to_string(),
-                language: language.as_str().to_string(),
-                symbol_name: format!("{}__part{}", parent_name, idx),
-                symbol_kind: format!("{}_part", parent_kind),
-                symbol_path: format!("{}::__part{}__", parent_path, idx),
-                parent_symbol: Some(parent_path.to_string()),
+                path: ctx.path.to_string(),
+                language: ctx.language.as_str().to_string(),
+                symbol_name: format!("{}__part{}", parent.name, idx),
+                symbol_kind: format!("{}_part", parent.kind),
+                symbol_path: format!("{}::__part{}__", parent.path, idx),
+                parent_symbol: Some(parent.path.to_string()),
                 line_start: chunk_line_start,
                 line_end: chunk_line_start + line_chunk.len() as u32,
                 byte_start: node.start_byte() as u32,
                 byte_end: node.end_byte() as u32,
-                imports: if imports.is_empty() {
+                imports: if ctx.imports.is_empty() {
                     None
                 } else {
-                    Some(imports.to_string())
+                    Some(ctx.imports.to_string())
                 },
-                signature: if idx == 0 { signature.clone() } else { None },
-                doc_comment: if idx == 0 { doc_comment.clone() } else { None },
+                signature: if idx == 0 {
+                    parent.signature.clone()
+                } else {
+                    None
+                },
+                doc_comment: if idx == 0 {
+                    parent.doc_comment.clone()
+                } else {
+                    None
+                },
                 chunk_text: text,
                 content_hash: hash,
-                file_mtime: file_mtime.to_string(),
-                file_size,
+                file_mtime: ctx.file_mtime.to_string(),
+                file_size: ctx.file_size,
             });
         }
     }
@@ -539,12 +525,10 @@ fn find_child_by_field_name<'a>(node: &'a Node<'a>, field: &str) -> Option<Node<
 
 fn find_child_by_kind<'a>(node: &'a Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if child.kind() == kind {
-            return Some(child);
-        }
-    }
-    None
+    let result = node
+        .children(&mut cursor)
+        .find(|child| child.kind() == kind);
+    result
 }
 
 fn extract_file_stem(path: &str) -> String {
