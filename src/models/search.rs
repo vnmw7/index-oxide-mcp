@@ -49,31 +49,7 @@ pub struct SearchResponse {
     pub query_embedding_model: String,
 }
 
-/// Parameters for index_repository MCP tool.
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct IndexRequest {
-    /// Absolute path to the repository root
-    pub root_path: String,
-    /// Optional include glob patterns
-    pub include_globs: Option<Vec<String>>,
-    /// Optional exclude glob patterns
-    pub exclude_globs: Option<Vec<String>>,
-    /// Optional language allowlist
-    pub languages: Option<Vec<String>>,
-    /// "full" or "incremental" (default "full")
-    pub mode: Option<String>,
-}
-
-/// Parameters for refresh_index MCP tool.
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct RefreshRequest {
-    /// Absolute path to the repository root
-    pub root_path: String,
-    /// Optional repository name override
-    pub repo: Option<String>,
-}
-
-/// Response from refresh_index tool.
+/// Response from refresh_index operation.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RefreshResponse {
     pub added: u64,
@@ -81,26 +57,3 @@ pub struct RefreshResponse {
     pub deleted: u64,
     pub unchanged: u64,
 }
-
-/// Parameters for get_index_status MCP tool.
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct StatusRequest {
-    pub job_id: String,
-}
-
-/// Parameters for cancel_index_job MCP tool.
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct CancelRequest {
-    pub job_id: String,
-}
-
-/// Parameters for clear_repo_index MCP tool.
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct ClearRepoRequest {
-    /// Repository name to clear
-    pub repo: String,
-}
-
-/// Parameters for list_indexed_repositories MCP tool.
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct ListReposRequest {}
