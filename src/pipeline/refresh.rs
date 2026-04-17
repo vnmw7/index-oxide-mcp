@@ -87,15 +87,36 @@ pub async fn refresh_index(
                 current.insert(relative_path.clone(), (mtime.clone(), size));
             }
 
-            // Metadata-based comparison (Fast Path)
+            // Hybrid Metadata + Lazy Hashing
             match indexed.get(&relative_path) {
-                Some((indexed_mtime, indexed_size, _hash)) => {
+                Some((indexed_mtime, indexed_size, indexed_hash)) => {
+                    let mut is_modified = false;
+
                     if indexed_mtime != &mtime || *indexed_size != size {
                         debug!(path = %relative_path, "Modified (metadata)");
+                        is_modified = true;
+                    } else {
+                        // Metadata matches, perform lazy hash check
+                        match std::fs::read_to_string(path) {
+                            Ok(content) => {
+                                let current_hash = crate::util::hashing::compute_content_hash(&content);
+                                if &current_hash != indexed_hash {
+                                    debug!(path = %relative_path, "Modified (lazy hash mismatch)");
+                                    is_modified = true;
+                                } else {
+                                    debug!(path = %relative_path, "Unchanged (lazy hash match)");
+                                }
+                            }
+                            Err(e) => {
+                                warn!(path = %relative_path, error = %e, "Failed to read file for lazy hash check, marking as modified");
+                                is_modified = true;
+                            }
+                        }
+                    }
+
+                    if is_modified {
                         let mut changed = changed_files.lock().unwrap();
                         changed.push(path.to_path_buf());
-                    } else {
-                        debug!(path = %relative_path, "Unchanged");
                     }
                 }
                 None => {
