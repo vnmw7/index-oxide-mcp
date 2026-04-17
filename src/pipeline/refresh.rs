@@ -7,10 +7,10 @@
 use crate::config::OxiConfig;
 use crate::gemini::client::GeminiClient;
 use crate::models::search::RefreshResponse;
+use crate::pipeline::filters::{self, FilterResult};
 use crate::qdrant::client::OxiQdrantClient;
 use crate::util::hashing::build_collection_name;
-use crate::util::language::detect_language;
-use ignore::{WalkBuilder, WalkState};
+use ignore::WalkState;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -24,6 +24,8 @@ pub async fn refresh_index(
     config: &Arc<OxiConfig>,
     gemini: &Arc<GeminiClient>,
     qdrant: &Arc<OxiQdrantClient>,
+    include_globs: Option<Vec<String>>,
+    exclude_globs: Option<Vec<String>>,
 ) -> anyhow::Result<RefreshResponse> {
     let collection_name = build_collection_name(repo_name);
 
@@ -38,11 +40,8 @@ pub async fn refresh_index(
     let current_files = Arc::new(Mutex::new(HashMap::<String, (String, u64)>::new()));
     let changed_files = Arc::new(Mutex::new(Vec::<PathBuf>::new()));
 
-    let walker = WalkBuilder::new(root_path)
-        .hidden(true)
-        .git_ignore(true)
-        .threads(config.pipeline.discovery_workers)
-        .build_parallel();
+    let filter = Arc::new(filters::FileFilter::new(include_globs, exclude_globs));
+    let walker = filters::build_walker(root_path, config.pipeline.discovery_workers).build_parallel();
 
     let root_path_buf = root_path.to_path_buf();
     let indexed_metadata_arc = Arc::new(indexed_metadata);
@@ -50,6 +49,7 @@ pub async fn refresh_index(
     walker.run(|| {
         let current_files = Arc::clone(&current_files);
         let changed_files = Arc::clone(&changed_files);
+        let filter = Arc::clone(&filter);
         let root = root_path_buf.clone();
         let indexed = Arc::clone(&indexed_metadata_arc);
 
@@ -59,11 +59,13 @@ pub async fn refresh_index(
                 Err(_) => return WalkState::Continue,
             };
 
-            let path = entry.path();
-            if path.is_dir() || detect_language(path).is_none() {
-                return WalkState::Continue;
+            match filter.check(&entry) {
+                FilterResult::SkipDir => return WalkState::Skip,
+                FilterResult::Ignore => return WalkState::Continue,
+                FilterResult::ProcessFile => {}
             }
 
+            let path = entry.path();
             let relative_path = path
                 .strip_prefix(&root)
                 .unwrap_or(path)

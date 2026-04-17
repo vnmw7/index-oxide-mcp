@@ -7,6 +7,7 @@
 pub mod chunker;
 pub mod discovery;
 pub mod embedder;
+pub mod filters;
 pub mod indexer;
 pub mod parser;
 pub mod refresh;

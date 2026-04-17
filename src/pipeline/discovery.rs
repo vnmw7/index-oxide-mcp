@@ -6,35 +6,13 @@
 
 use crate::config::OxiConfig;
 use crate::models::job::IndexJob;
-use crate::util::language::{detect_language, is_binary_extension};
-use ignore::{WalkBuilder, WalkState};
+use crate::pipeline::filters::{self, FilterResult};
+use ignore::WalkState;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
-
-/// Standard directories to always skip during discovery.
-const SKIP_DIRS: &[&str] = &[
-    "target",
-    "node_modules",
-    ".git",
-    "__pycache__",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".tox",
-    ".venv",
-    "venv",
-    "dist",
-    "build",
-    ".next",
-    ".nuxt",
-    "vendor",
-    "coverage",
-    ".idea",
-    ".vscode",
-    ".vs",
-];
 
 /// Walk the repository discovering source files, respecting .gitignore.
 /// Sends discovered paths into a bounded channel.
@@ -51,38 +29,15 @@ pub async fn discover_files(
     // Use tokio::task::spawn_blocking since ignore::Walk is synchronous
     let (blocking_tx, mut blocking_rx) = mpsc::channel::<PathBuf>(512);
 
-    // Pre-compile glob patterns to avoid overhead in the visitor
-    let include_patterns = include_globs.map(|globs| {
-        globs
-            .into_iter()
-            .filter_map(|g| glob::Pattern::new(&g).ok())
-            .collect::<Vec<_>>()
-    });
-    let exclude_patterns = exclude_globs.map(|globs| {
-        globs
-            .into_iter()
-            .filter_map(|g| glob::Pattern::new(&g).ok())
-            .collect::<Vec<_>>()
-    });
-
-    let include_patterns = Arc::new(include_patterns);
-    let exclude_patterns = Arc::new(exclude_patterns);
+    let filter = Arc::new(filters::FileFilter::new(include_globs, exclude_globs));
     let discovery_workers = config.pipeline.discovery_workers;
 
     let walk_handle = tokio::task::spawn_blocking(move || {
-        let mut builder = WalkBuilder::new(&root_owned);
-        builder
-            .hidden(true) // skip hidden files
-            .git_ignore(true) // respect .gitignore
-            .git_global(true) // respect global gitignore
-            .git_exclude(true) // respect .git/info/exclude
-            .threads(discovery_workers);
-
+        let builder = filters::build_walker(&root_owned, discovery_workers);
         let walker = builder.build_parallel();
 
         walker.run(|| {
-            let include = Arc::clone(&include_patterns);
-            let exclude = Arc::clone(&exclude_patterns);
+            let filter = Arc::clone(&filter);
             let blocking_tx = blocking_tx.clone();
 
             Box::new(move |entry| {
@@ -94,49 +49,15 @@ pub async fn discover_files(
                     }
                 };
 
-                let path = entry.path();
-
-                // Skip directories from the skip list
-                if path.is_dir() {
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        if SKIP_DIRS.contains(&name) {
-                            return WalkState::Skip;
+                match filter.check(&entry) {
+                    FilterResult::SkipDir => return WalkState::Skip,
+                    FilterResult::Ignore => return WalkState::Continue,
+                    FilterResult::ProcessFile => {
+                        // Send to blocking channel (this blocks if downstream is slow = backpressure)
+                        if blocking_tx.blocking_send(entry.path().to_path_buf()).is_err() {
+                            return WalkState::Quit; // Receiver dropped
                         }
                     }
-                    return WalkState::Continue;
-                }
-
-                // Skip binary files
-                if is_binary_extension(path) {
-                    return WalkState::Continue;
-                }
-
-                // Check if file has a supported language
-                if detect_language(path).is_none() {
-                    return WalkState::Continue;
-                }
-
-                // Apply include glob filters
-                if let Some(ref includes) = *include {
-                    let path_str = path.to_string_lossy();
-                    let matched = includes.iter().any(|p| p.matches(&path_str));
-                    if !matched {
-                        return WalkState::Continue;
-                    }
-                }
-
-                // Apply exclude glob filters
-                if let Some(ref excludes) = *exclude {
-                    let path_str = path.to_string_lossy();
-                    let excluded = excludes.iter().any(|p| p.matches(&path_str));
-                    if excluded {
-                        return WalkState::Continue;
-                    }
-                }
-
-                // Send to blocking channel (this blocks if downstream is slow = backpressure)
-                if blocking_tx.blocking_send(path.to_path_buf()).is_err() {
-                    return WalkState::Quit; // Receiver dropped
                 }
 
                 WalkState::Continue
