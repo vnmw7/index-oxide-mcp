@@ -54,7 +54,10 @@ pub async fn discover_files(
                     FilterResult::Ignore => return WalkState::Continue,
                     FilterResult::ProcessFile => {
                         // Send to blocking channel (this blocks if downstream is slow = backpressure)
-                        if blocking_tx.blocking_send(entry.path().to_path_buf()).is_err() {
+                        if blocking_tx
+                            .blocking_send(entry.path().to_path_buf())
+                            .is_err()
+                        {
                             return WalkState::Quit; // Receiver dropped
                         }
                     }

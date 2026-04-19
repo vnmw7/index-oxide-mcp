@@ -41,7 +41,8 @@ pub async fn refresh_index(
     let changed_files = Arc::new(Mutex::new(Vec::<PathBuf>::new()));
 
     let filter = Arc::new(filters::FileFilter::new(include_globs, exclude_globs));
-    let walker = filters::build_walker(root_path, config.pipeline.discovery_workers).build_parallel();
+    let walker =
+        filters::build_walker(root_path, config.pipeline.discovery_workers).build_parallel();
 
     let root_path_buf = root_path.to_path_buf();
     let indexed_metadata_arc = Arc::new(indexed_metadata);
