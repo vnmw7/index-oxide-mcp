@@ -16,18 +16,6 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, Semaphore};
 use tracing::{debug, error, warn};
 
-/// Context for embedding operations.
-struct EmbedContext<'a> {
-    tx: &'a mpsc::Sender<EmbeddedChunk>,
-    job: &'a Arc<IndexJob>,
-    gemini: &'a Arc<GeminiClient>,
-    qdrant: &'a Arc<OxiQdrantClient>,
-    collection_name: &'a str,
-    semaphore: &'a Arc<Semaphore>,
-    max_retries: u32,
-    model: &'a str,
-}
-
 /// Run the embedding stage, consuming chunks and producing embedded chunks.
 pub async fn run_embedder(
     mut rx: mpsc::Receiver<CodeChunk>,
@@ -41,22 +29,14 @@ pub async fn run_embedder(
     let max_tokens = config.pipeline.embed_batch_max_tokens;
     let max_retries = config.pipeline.max_retries;
     let collection_name = build_collection_name(&job.repo_name);
+    let model = config.gemini.model.clone();
 
     // Accumulate chunks into batches
     let mut batch_chunks: Vec<CodeChunk> = Vec::new();
     let mut batch_tokens: usize = 0;
     let batch_max_items = config.pipeline.embed_batch_max_items;
 
-    let ctx = EmbedContext {
-        tx: &tx,
-        job,
-        gemini,
-        qdrant,
-        collection_name: &collection_name,
-        semaphore: &semaphore,
-        max_retries,
-        model: &config.gemini.model,
-    };
+    let mut join_set = tokio::task::JoinSet::new();
 
     loop {
         if job.is_cancelled() {
@@ -80,37 +60,65 @@ pub async fn run_embedder(
                     let batch = std::mem::take(&mut batch_chunks);
                     batch_tokens = 0;
 
-                    process_batch(batch, &ctx).await;
+                    let permit = semaphore.clone().acquire_owned().await.unwrap();
+                    join_set.spawn(process_batch(
+                        batch,
+                        tx.clone(),
+                        job.clone(),
+                        gemini.clone(),
+                        qdrant.clone(),
+                        collection_name.clone(),
+                        permit,
+                        max_retries,
+                        model.clone(),
+                    ));
                 }
             }
             None => {
                 // Channel closed — flush remaining batch
                 if !batch_chunks.is_empty() {
                     let batch = std::mem::take(&mut batch_chunks);
-                    process_batch(batch, &ctx).await;
+                    let permit = semaphore.clone().acquire_owned().await.unwrap();
+                    join_set.spawn(process_batch(
+                        batch,
+                        tx.clone(),
+                        job.clone(),
+                        gemini.clone(),
+                        qdrant.clone(),
+                        collection_name.clone(),
+                        permit,
+                        max_retries,
+                        model.clone(),
+                    ));
                 }
                 break;
             }
         }
     }
 
+    // Wait for all batches to complete
+    while let Some(_) = join_set.join_next().await {}
+
     debug!("Embedder stage complete");
 }
 
-async fn process_batch(batch: Vec<CodeChunk>, ctx: &EmbedContext<'_>) {
-    // Acquire semaphore permit for concurrency control
-    let _permit = match ctx.semaphore.acquire().await {
-        Ok(p) => p,
-        Err(_) => return, // Semaphore closed
-    };
-
+async fn process_batch(
+    batch: Vec<CodeChunk>,
+    tx: mpsc::Sender<EmbeddedChunk>,
+    job: Arc<IndexJob>,
+    gemini: Arc<GeminiClient>,
+    qdrant: Arc<OxiQdrantClient>,
+    collection_name: String,
+    _permit: tokio::sync::OwnedSemaphorePermit,
+    max_retries: u32,
+    model: String,
+) {
     let now = Utc::now().to_rfc3339();
 
     // 1. Check Cache: Try to find existing embeddings by content_hash
     let hashes: Vec<String> = batch.iter().map(|c| c.content_hash.clone()).collect();
-    let cached_embeddings = match ctx
-        .qdrant
-        .get_embeddings_by_hashes(ctx.collection_name, &hashes)
+    let cached_embeddings = match qdrant
+        .get_embeddings_by_hashes(&collection_name, &hashes)
         .await
     {
         Ok(map) => map,
@@ -130,7 +138,7 @@ async fn process_batch(batch: Vec<CodeChunk>, ctx: &EmbedContext<'_>) {
             results.push(EmbeddedChunk {
                 chunk,
                 embedding: embedding.clone(),
-                embedding_model: ctx.model.to_string(),
+                embedding_model: model.to_string(),
                 embedding_version: "1".to_string(),
                 indexed_at: now.clone(),
             });
@@ -154,9 +162,8 @@ async fn process_batch(batch: Vec<CodeChunk>, ctx: &EmbedContext<'_>) {
             })
             .collect();
 
-        match ctx
-            .gemini
-            .embed_batch(&inputs, "RETRIEVAL_DOCUMENT", ctx.max_retries)
+        match gemini
+            .embed_batch(&inputs, "RETRIEVAL_DOCUMENT", max_retries)
             .await
         {
             Ok(embed_result) => {
@@ -167,7 +174,7 @@ async fn process_batch(batch: Vec<CodeChunk>, ctx: &EmbedContext<'_>) {
                     results.push(EmbeddedChunk {
                         chunk,
                         embedding,
-                        embedding_model: ctx.model.to_string(),
+                        embedding_model: model.to_string(),
                         embedding_version: "1".to_string(),
                         indexed_at: now.clone(),
                     });
@@ -175,11 +182,10 @@ async fn process_batch(batch: Vec<CodeChunk>, ctx: &EmbedContext<'_>) {
             }
             Err(e) => {
                 error!(count = cache_misses, error = %e, "Embedding batch failed");
-                ctx.job
-                    .counters
+                job.counters
                     .failed
                     .fetch_add(cache_misses as u64, Ordering::Relaxed);
-                ctx.job.add_error(format!(
+                job.add_error(format!(
                     "Embedding failed for {} chunks: {}",
                     cache_misses, e
                 ));
@@ -190,8 +196,8 @@ async fn process_batch(batch: Vec<CodeChunk>, ctx: &EmbedContext<'_>) {
 
     // 4. Send all successful results downstream
     for embedded in results {
-        ctx.job.counters.embedded.fetch_add(1, Ordering::Relaxed);
-        if ctx.tx.send(embedded).await.is_err() {
+        job.counters.embedded.fetch_add(1, Ordering::Relaxed);
+        if tx.send(embedded).await.is_err() {
             return; // Downstream closed
         }
     }
