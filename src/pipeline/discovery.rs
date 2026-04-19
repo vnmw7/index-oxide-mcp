@@ -183,7 +183,7 @@ mod tests {
         .await?;
 
         let mut discovered = Vec::new();
-        while let Some(path) = rx.try_recv().ok() {
+        while let Ok(path) = rx.try_recv() {
             discovered.push(path);
         }
         assert_eq!(discovered.len(), 2);
@@ -201,7 +201,7 @@ mod tests {
         .await?;
 
         let mut discovered = Vec::new();
-        while let Some(path) = rx.try_recv().ok() {
+        while let Ok(path) = rx.try_recv() {
             discovered.push(path);
         }
         assert_eq!(discovered.len(), 2); // main.rs and app.py

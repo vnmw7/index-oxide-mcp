@@ -10,7 +10,7 @@ First off, thank you for considering contributing to Index Oxide MCP!
     ```sh
     cargo test
     cargo fmt
-    cargo clippy
+    cargo clippy --all-targets --all-features -- -D warnings
     ```
 4. **Open a Pull Request**. Ensure you provide a clear description of your changes.
 
