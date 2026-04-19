@@ -68,8 +68,32 @@ impl FileFilter {
         }
     }
 
+    /// Checks if a path string matches the configured globs.
+    /// Standardizes on forward slashes for cross-platform glob matching.
+    pub fn matches_globs(&self, path_str: &str) -> bool {
+        let normalized = path_str.replace('\\', "/");
+
+        // Apply include glob filters
+        if let Some(ref includes) = self.include_patterns {
+            let matched = includes.iter().any(|p| p.matches(&normalized));
+            if !matched {
+                return false;
+            }
+        }
+
+        // Apply exclude glob filters
+        if let Some(ref excludes) = self.exclude_patterns {
+            let excluded = excludes.iter().any(|p| p.matches(&normalized));
+            if excluded {
+                return false;
+            }
+        }
+
+        true
+    }
+
     /// Determines if an entry should be processed, ignored, or if a directory should be skipped entirely.
-    pub fn check(&self, entry: &DirEntry) -> FilterResult {
+    pub fn check(&self, entry: &DirEntry, relative_path: &str) -> FilterResult {
         let path = entry.path();
 
         if path.is_dir() {
@@ -91,22 +115,9 @@ impl FileFilter {
             return FilterResult::Ignore;
         }
 
-        let path_str = path.to_string_lossy();
-
-        // Apply include glob filters
-        if let Some(ref includes) = self.include_patterns {
-            let matched = includes.iter().any(|p| p.matches(&path_str));
-            if !matched {
-                return FilterResult::Ignore;
-            }
-        }
-
-        // Apply exclude glob filters
-        if let Some(ref excludes) = self.exclude_patterns {
-            let excluded = excludes.iter().any(|p| p.matches(&path_str));
-            if excluded {
-                return FilterResult::Ignore;
-            }
+        // Use the centralized glob matcher with the relative path
+        if !self.matches_globs(relative_path) {
+            return FilterResult::Ignore;
         }
 
         FilterResult::ProcessFile
@@ -123,4 +134,38 @@ pub fn build_walker(root: &Path, threads: usize) -> WalkBuilder {
         .git_exclude(true) // respect .git/info/exclude
         .threads(threads);
     builder
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_matches_globs_normalization() {
+        let filter = FileFilter::new(Some(vec!["src/**/*.rs".to_string()]), None);
+
+        // Linux path
+        assert!(filter.matches_globs("src/main.rs"));
+        // Windows path
+        assert!(filter.matches_globs("src\\main.rs"));
+        // Mismatch
+        assert!(!filter.matches_globs("app/main.py"));
+    }
+
+    #[test]
+    fn test_matches_globs_exclude() {
+        let filter = FileFilter::new(
+            Some(vec!["src/**/*.rs".to_string()]),
+            Some(vec!["src/generated/*.rs".to_string()]),
+        );
+
+        assert!(filter.matches_globs("src/main.rs"));
+        assert!(!filter.matches_globs("src/generated/types.rs"));
+    }
+
+    #[test]
+    fn test_matches_globs_empty() {
+        let filter = FileFilter::new(None, None);
+        assert!(filter.matches_globs("any/path.rs"));
+    }
 }

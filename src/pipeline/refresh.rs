@@ -60,18 +60,18 @@ pub async fn refresh_index(
                 Err(_) => return WalkState::Continue,
             };
 
-            match filter.check(&entry) {
-                FilterResult::SkipDir => return WalkState::Skip,
-                FilterResult::Ignore => return WalkState::Continue,
-                FilterResult::ProcessFile => {}
-            }
-
             let path = entry.path();
             let relative_path = path
                 .strip_prefix(&root)
                 .unwrap_or(path)
                 .to_string_lossy()
                 .replace('\\', "/");
+
+            match filter.check(&entry, &relative_path) {
+                FilterResult::SkipDir => return WalkState::Skip,
+                FilterResult::Ignore => return WalkState::Continue,
+                FilterResult::ProcessFile => {}
+            }
 
             let metadata = match entry.metadata() {
                 Ok(m) => m,
@@ -146,6 +146,11 @@ pub async fn refresh_index(
     let deleted_files: Vec<String> = indexed_metadata_arc
         .keys()
         .filter(|path| !current_files.contains_key(*path))
+        .filter(|path| {
+            // 'path' is a relative String with forward slashes from the index.
+            // We only delete if the file is within the current refresh scope.
+            filter.matches_globs(path)
+        })
         .cloned()
         .collect();
 

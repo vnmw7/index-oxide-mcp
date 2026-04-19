@@ -39,6 +39,7 @@ pub async fn discover_files(
         walker.run(|| {
             let filter = Arc::clone(&filter);
             let blocking_tx = blocking_tx.clone();
+            let root = root_owned.clone();
 
             Box::new(move |entry| {
                 let entry = match entry {
@@ -49,7 +50,14 @@ pub async fn discover_files(
                     }
                 };
 
-                match filter.check(&entry) {
+                let path = entry.path();
+                let relative_path = path
+                    .strip_prefix(&root)
+                    .unwrap_or(path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+
+                match filter.check(&entry, &relative_path) {
                     FilterResult::SkipDir => return WalkState::Skip,
                     FilterResult::Ignore => return WalkState::Continue,
                     FilterResult::ProcessFile => {
