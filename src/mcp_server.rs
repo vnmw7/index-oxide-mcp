@@ -1,7 +1,7 @@
 /*
  * System: Index Oxide MCP
  * File URL: oxidized-index-mcp/src/mcp_server.rs
- * Purpose: MCP server exposing indexing, search, and management tools (Dual-mode SSE/Stdio)
+ * Purpose: MCP server for searching in indexed codebases (Dual-mode SSE/Stdio)
  */
 
 use crate::config::OxiConfig;
