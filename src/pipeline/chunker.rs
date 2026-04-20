@@ -17,6 +17,7 @@ struct FileContext<'a> {
     repo: &'a str,
     file_mtime: &'a str,
     file_size: u64,
+    file_hash: &'a str,
     imports: &'a str,
 }
 
@@ -36,6 +37,9 @@ pub fn extract_chunks(
     let root = tree.root_node();
     let mut chunks = Vec::new();
 
+    // Compute full file hash once for all chunks
+    let file_hash = compute_content_hash(source);
+
     // Extract file-level imports once
     let imports = extract_imports(&root, source, language);
 
@@ -46,6 +50,7 @@ pub fn extract_chunks(
         repo,
         file_mtime,
         file_size,
+        file_hash: &file_hash,
         imports: &imports,
     };
 
@@ -86,6 +91,7 @@ pub fn extract_chunks(
             doc_comment: None,
             chunk_text: source.to_string(),
             content_hash,
+            file_hash: file_hash.to_string(),
             file_mtime: file_mtime.to_string(),
             file_size,
         });
@@ -159,6 +165,7 @@ fn extract_from_node(
             doc_comment,
             chunk_text,
             content_hash,
+            file_hash: ctx.file_hash.to_string(),
             file_mtime: ctx.file_mtime.to_string(),
             file_size: ctx.file_size,
         });
@@ -422,6 +429,7 @@ fn split_oversized_node(
                 doc_comment: extract_doc_comment(&child, ctx.source, ctx.language),
                 chunk_text: text,
                 content_hash: hash,
+                file_hash: ctx.file_hash.to_string(),
                 file_mtime: ctx.file_mtime.to_string(),
                 file_size: ctx.file_size,
             });
@@ -460,6 +468,7 @@ fn split_oversized_node(
                     doc_comment: parent.doc_comment.clone(),
                     chunk_text: header_text,
                     content_hash: hash,
+                    file_hash: ctx.file_hash.to_string(),
                     file_mtime: ctx.file_mtime.to_string(),
                     file_size: ctx.file_size,
                 });
@@ -510,6 +519,7 @@ fn split_oversized_node(
                 },
                 chunk_text: text,
                 content_hash: hash,
+                file_hash: ctx.file_hash.to_string(),
                 file_mtime: ctx.file_mtime.to_string(),
                 file_size: ctx.file_size,
             });

@@ -135,6 +135,7 @@ impl OxiQdrantClient {
                     "doc_comment": ec.chunk.doc_comment,
                     "chunk_text": ec.chunk.chunk_text,
                     "content_hash": ec.chunk.content_hash,
+                    "file_hash": ec.chunk.file_hash,
                     "file_mtime": ec.chunk.file_mtime,
                     "file_size": ec.chunk.file_size,
                     "embedding_model": ec.embedding_model,
@@ -288,7 +289,7 @@ impl OxiQdrantClient {
                     "path".to_string(),
                     "file_mtime".to_string(),
                     "file_size".to_string(),
-                    "content_hash".to_string(),
+                    "file_hash".to_string(),
                 ],
             });
 
@@ -308,13 +309,13 @@ impl OxiQdrantClient {
                     payload.get("path"),
                     payload.get("file_mtime"),
                     payload.get("file_size"),
-                    payload.get("content_hash"),
+                    payload.get("file_hash"),
                 ) {
                     if let (Some(path), Some(mtime), Some(hash)) =
                         (path_val.as_str(), mtime_val.as_str(), hash_val.as_str())
                     {
                         let size = size_val.as_integer().unwrap_or(0) as u64;
-                        // Use the last seen one (should be consistent per file)
+                        // Use the last seen one (this is now the file-level hash, so it's consistent)
                         result.insert(
                             path.to_string(),
                             (mtime.to_string(), size, hash.to_string()),
