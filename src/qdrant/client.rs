@@ -9,10 +9,9 @@ use crate::errors::StorageError;
 use crate::models::chunk::EmbeddedChunk;
 use crate::util::hashing::{build_collection_name, generate_chunk_id};
 use qdrant_client::qdrant::{
-    CreateCollectionBuilder, Distance, FieldType, Filter, HnswConfigDiffBuilder,
-    PointStruct, QueryPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
-    Condition, CreateFieldIndexCollectionBuilder,
-    PointsSelector, ScrollPointsBuilder, PayloadIncludeSelector,
+    Condition, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder, Distance, FieldType,
+    Filter, HnswConfigDiffBuilder, PayloadIncludeSelector, PointStruct, PointsSelector,
+    QueryPointsBuilder, ScrollPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
 };
 use qdrant_client::Qdrant;
 use serde_json::json;
@@ -74,18 +73,17 @@ impl OxiQdrantClient {
             ("path", FieldType::Keyword),
             ("symbol_name", FieldType::Keyword),
             ("symbol_kind", FieldType::Keyword),
+            ("content_hash", FieldType::Keyword),
         ];
 
         for (field, field_type) in indexed_fields {
             if let Err(e) = self
                 .client
-                .create_field_index(
-                    CreateFieldIndexCollectionBuilder::new(
-                        &collection_name,
-                        field,
-                        field_type,
-                    ),
-                )
+                .create_field_index(CreateFieldIndexCollectionBuilder::new(
+                    &collection_name,
+                    field,
+                    field_type,
+                ))
                 .await
             {
                 warn!(field, collection = %collection_name, error = %e, "Failed to create field index (non-fatal)");
@@ -137,7 +135,9 @@ impl OxiQdrantClient {
                     "doc_comment": ec.chunk.doc_comment,
                     "chunk_text": ec.chunk.chunk_text,
                     "content_hash": ec.chunk.content_hash,
+                    "file_hash": ec.chunk.file_hash,
                     "file_mtime": ec.chunk.file_mtime,
+                    "file_size": ec.chunk.file_size,
                     "embedding_model": ec.embedding_model,
                     "embedding_version": ec.embedding_version,
                     "indexed_at": ec.indexed_at,
@@ -232,14 +232,12 @@ impl OxiQdrantClient {
         let filter = Filter::must(vec![Condition::matches("path", path.to_string())]);
 
         self.client
-            .delete_points(
-                qdrant_client::qdrant::DeletePoints {
-                    collection_name: collection_name.to_string(),
-                    points: Some(PointsSelector::from(filter)),
-                    wait: Some(true),
-                    ..Default::default()
-                }
-            )
+            .delete_points(qdrant_client::qdrant::DeletePoints {
+                collection_name: collection_name.to_string(),
+                points: Some(PointsSelector::from(filter)),
+                wait: Some(true),
+                ..Default::default()
+            })
             .await
             .map_err(|e| StorageError::DeleteFailed(e.to_string()))?;
 
@@ -275,18 +273,24 @@ impl OxiQdrantClient {
             .collect())
     }
 
-    /// Scroll all indexed metadata for a path (used during refresh comparison).
-    pub async fn get_indexed_paths(
+    /// Scroll all indexed metadata for a repo (used during refresh comparison).
+    /// Returns a map of path -> (file_mtime, file_size, content_hash)
+    pub async fn get_indexed_metadata(
         &self,
         collection_name: &str,
-    ) -> Result<std::collections::HashMap<String, String>, StorageError> {
+    ) -> Result<std::collections::HashMap<String, (String, u64, String)>, StorageError> {
         let mut result = std::collections::HashMap::new();
         let mut offset: Option<qdrant_client::qdrant::PointId> = None;
 
         loop {
-            let mut scroll = ScrollPointsBuilder::new(collection_name).limit(100);
+            let mut scroll = ScrollPointsBuilder::new(collection_name).limit(1000);
             scroll = scroll.with_payload(PayloadIncludeSelector {
-                fields: vec!["path".to_string(), "content_hash".to_string()],
+                fields: vec![
+                    "path".to_string(),
+                    "file_mtime".to_string(),
+                    "file_size".to_string(),
+                    "file_hash".to_string(),
+                ],
             });
 
             if let Some(off) = offset.clone() {
@@ -301,14 +305,21 @@ impl OxiQdrantClient {
 
             for point in &response.result {
                 let payload = &point.payload;
-                if let (Some(path_val), Some(hash_val)) =
-                    (payload.get("path"), payload.get("content_hash"))
-                {
-                    if let (Some(path), Some(hash)) = (
-                        path_val.as_str(),
-                        hash_val.as_str(),
-                    ) {
-                        result.insert(path.to_string(), hash.to_string());
+                if let (Some(path_val), Some(mtime_val), Some(size_val), Some(hash_val)) = (
+                    payload.get("path"),
+                    payload.get("file_mtime"),
+                    payload.get("file_size"),
+                    payload.get("file_hash"),
+                ) {
+                    if let (Some(path), Some(mtime), Some(hash)) =
+                        (path_val.as_str(), mtime_val.as_str(), hash_val.as_str())
+                    {
+                        let size = size_val.as_integer().unwrap_or(0) as u64;
+                        // Use the last seen one (this is now the file-level hash, so it's consistent)
+                        result.insert(
+                            path.to_string(),
+                            (mtime.to_string(), size, hash.to_string()),
+                        );
                     }
                 }
             }
@@ -316,6 +327,61 @@ impl OxiQdrantClient {
             offset = response.next_page_offset;
             if offset.is_none() {
                 break;
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Fetch embeddings for a list of content hashes (Embedding Cache).
+    pub async fn get_embeddings_by_hashes(
+        &self,
+        collection_name: &str,
+        hashes: &[String],
+    ) -> Result<std::collections::HashMap<String, Vec<f32>>, StorageError> {
+        if hashes.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let filter = Filter::must(vec![Condition::matches(
+            "content_hash".to_string(),
+            hashes.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+        )]);
+
+        let scroll = ScrollPointsBuilder::new(collection_name)
+            .filter(filter)
+            .limit(hashes.len() as u32)
+            .with_payload(PayloadIncludeSelector {
+                fields: vec!["content_hash".to_string()],
+            })
+            .with_vectors(true);
+
+        let response = self
+            .client
+            .scroll(scroll)
+            .await
+            .map_err(|e| StorageError::QueryFailed(e.to_string()))?;
+
+        let mut result = std::collections::HashMap::new();
+        for point in response.result {
+            if let Some(hash_val) = point.payload.get("content_hash") {
+                if let Some(hash) = hash_val.as_str() {
+                    if let Some(vectors) = point.vectors {
+                        if let Some(
+                            qdrant_client::qdrant::vectors_output::VectorsOptions::Vector(v),
+                        ) = vectors.vectors_options
+                        {
+                            match v.into_vector() {
+                                qdrant_client::qdrant::vector_output::Vector::Dense(dense) => {
+                                    result.insert(hash.to_string(), dense.data);
+                                }
+                                _ => {
+                                    debug!(hash = %hash, "Ignored non-dense vector during cache hydration");
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

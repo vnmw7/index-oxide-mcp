@@ -22,15 +22,14 @@ use crate::gemini::client::GeminiClient;
 use crate::jobs::registry::JobRegistry;
 use crate::mcp_server::OxiServer;
 use crate::qdrant::client::OxiQdrantClient;
+use axum::Router;
+use clap::Parser;
+use rmcp::transport::streamable_http_server::{
+    session::local::LocalSessionManager, StreamableHttpService,
+};
 use rmcp::ServiceExt;
 use std::sync::Arc;
 use tracing::info;
-use clap::Parser;
-use axum::Router;
-use rmcp::transport::streamable_http_server::{
-    StreamableHttpService,
-    session::local::LocalSessionManager,
-};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -110,12 +109,14 @@ async fn main() -> anyhow::Result<()> {
                     let gemini = Arc::clone(&gemini_arc);
                     let qdrant = Arc::clone(&qdrant_arc);
                     let jobs = Arc::clone(&jobs_arc);
-                    move || Ok(OxiServer::new(
-                        Arc::clone(&config_arc),
-                        Arc::clone(&gemini),
-                        Arc::clone(&qdrant),
-                        Arc::clone(&jobs),
-                    ))
+                    move || {
+                        Ok(OxiServer::new(
+                            Arc::clone(&config_arc),
+                            Arc::clone(&gemini),
+                            Arc::clone(&qdrant),
+                            Arc::clone(&jobs),
+                        ))
+                    }
                 },
                 LocalSessionManager::default().into(),
                 Default::default(),

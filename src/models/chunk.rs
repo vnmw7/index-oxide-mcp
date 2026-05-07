@@ -46,8 +46,12 @@ pub struct CodeChunk {
     pub chunk_text: String,
     /// BLAKE3 hash of chunk_text
     pub content_hash: String,
+    /// BLAKE3 hash of the full file content (for refresh checks)
+    pub file_hash: String,
     /// File modification time (ISO 8601)
     pub file_mtime: String,
+    /// Total file size in bytes (for fast refresh checks)
+    pub file_size: u64,
 }
 
 /// A code chunk with its computed embedding vector, ready for indexing.

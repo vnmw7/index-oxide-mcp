@@ -92,7 +92,11 @@ impl EmbedInput {
     fn to_parts(&self) -> Vec<Part> {
         match self {
             EmbedInput::Text(text) => vec![Part::Text { text: text.clone() }],
-            EmbedInput::Multimodal { text, mime_type, data_base64 } => {
+            EmbedInput::Multimodal {
+                text,
+                mime_type,
+                data_base64,
+            } => {
                 let mut parts = Vec::new();
                 if let Some(t) = text {
                     parts.push(Part::Text { text: t.clone() });
@@ -112,7 +116,9 @@ impl EmbedInput {
     fn estimate_tokens(&self) -> usize {
         match self {
             EmbedInput::Text(text) => text.len() / 4,
-            EmbedInput::Multimodal { text, data_base64, .. } => {
+            EmbedInput::Multimodal {
+                text, data_base64, ..
+            } => {
                 let text_tokens = text.as_ref().map(|t| t.len() / 4).unwrap_or(0);
                 // Image/binary data counts as ~258 tokens (Gemini estimate for images)
                 text_tokens + 258 + (data_base64.len() / 1000)
@@ -193,7 +199,10 @@ impl GeminiClient {
         // Circuit breaker: if 3+ consecutive 429s, wait 30s
         let consecutive = self.consecutive_rate_limits.load(Ordering::Relaxed);
         if consecutive >= 3 {
-            warn!("Circuit breaker: {} consecutive rate limits, pausing 30s", consecutive);
+            warn!(
+                "Circuit breaker: {} consecutive rate limits, pausing 30s",
+                consecutive
+            );
             tokio::time::sleep(Duration::from_secs(30)).await;
             self.consecutive_rate_limits.store(0, Ordering::Relaxed);
         }
@@ -223,7 +232,11 @@ impl GeminiClient {
 
         loop {
             attempt += 1;
-            debug!(attempt, batch_size = inputs.len(), "Sending embedding batch");
+            debug!(
+                attempt,
+                batch_size = inputs.len(),
+                "Sending embedding batch"
+            );
 
             let response = self
                 .http
@@ -263,7 +276,10 @@ impl GeminiClient {
                 self.consecutive_rate_limits.fetch_add(1, Ordering::Relaxed);
 
                 if attempt > max_retries {
-                    error!("Max retries exceeded for embedding batch after {} attempts", attempt);
+                    error!(
+                        "Max retries exceeded for embedding batch after {} attempts",
+                        attempt
+                    );
                     return Err(EmbeddingError::MaxRetriesExceeded);
                 }
 
@@ -329,7 +345,10 @@ impl GeminiClient {
             // 5xx server errors: retry with backoff
             if status.is_server_error() {
                 if attempt > max_retries {
-                    return Err(EmbeddingError::ApiRequest(format!("Server error: {}", status)));
+                    return Err(EmbeddingError::ApiRequest(format!(
+                        "Server error: {}",
+                        status
+                    )));
                 }
 
                 let jitter_ms = rand::rng().random_range(0..500);
