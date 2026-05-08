@@ -41,6 +41,43 @@ docker-compose up -d
 
 By default, the server expects Qdrant at `http://localhost:6334`, which matches [`docker-compose.yml`](./docker-compose.yml).
 
+If you want to download and run the Qdrant image directly instead of using the repository compose file, pull the official image first:
+
+```sh
+docker pull qdrant/qdrant
+```
+
+Linux/macOS:
+
+```sh
+mkdir -p ./qdrant_storage
+docker run -d --name oxi-qdrant \
+  --restart unless-stopped \
+  -p 6333:6333 \
+  -p 6334:6334 \
+  -v "$(pwd)/qdrant_storage:/qdrant/storage" \
+  qdrant/qdrant
+```
+
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force .\qdrant_storage | Out-Null
+docker run -d --name oxi-qdrant `
+  --restart unless-stopped `
+  -p 6333:6333 `
+  -p 6334:6334 `
+  -v "${PWD}/qdrant_storage:/qdrant/storage" `
+  qdrant/qdrant
+```
+
+Qdrant ports used by this project:
+
+- `6334`: gRPC. Index Oxide MCP uses this through `QDRANT_URL`.
+- `6333`: HTTP/REST. Useful for health checks and Qdrant's local dashboard/API.
+
+Production note: Qdrant's official documentation recommends managed Qdrant Cloud, Kubernetes, or a carefully operated Docker/Compose deployment for production. If you self-host with Docker/Compose, use persistent SSD/NVMe-backed storage, restrict network access, configure security settings, and plan backup/restore, monitoring, and upgrades.
+
 ### 3. Configure Environment Variables
 
 Only `GEMINI_API_KEY` is required. Everything else has defaults.
@@ -169,6 +206,167 @@ For most local users:
 3. Add the `stdio` config to your MCP client
 4. Set `GEMINI_API_KEY` in the client config
 5. Restart your MCP client
+
+## Live / Production MCP Use
+
+Use this flow when you want to run the built MCP binary against a persistent Qdrant instance instead of running ad hoc development commands.
+
+### 1. Build or Download the MCP Binary
+
+For source builds:
+
+```sh
+cargo build --release
+```
+
+Use the release binary from one of these paths:
+
+- Windows: `D:\projects\index-oxide-mcp\target\release\index-oxide-mcp.exe`
+- Linux/macOS: `/absolute/path/to/index-oxide-mcp/target/release/index-oxide-mcp`
+
+If you are using a published release artifact instead, place the downloaded binary in a stable path such as `/opt/index-oxide-mcp/index-oxide-mcp` or `C:\Tools\index-oxide-mcp\index-oxide-mcp.exe` and point your MCP client to that exact file.
+
+### 2. Run Qdrant as a Persistent Service
+
+Recommended repository-local option:
+
+```sh
+docker-compose up -d qdrant
+```
+
+Direct Docker option after pulling the image:
+
+```sh
+docker pull qdrant/qdrant
+docker run -d --name oxi-qdrant --restart unless-stopped -p 6333:6333 -p 6334:6334 -v "$(pwd)/qdrant_storage:/qdrant/storage" qdrant/qdrant
+```
+
+Windows PowerShell direct Docker option:
+
+```powershell
+docker pull qdrant/qdrant
+New-Item -ItemType Directory -Force .\qdrant_storage | Out-Null
+docker run -d --name oxi-qdrant --restart unless-stopped -p 6333:6333 -p 6334:6334 -v "${PWD}/qdrant_storage:/qdrant/storage" qdrant/qdrant
+```
+
+Verify Qdrant is reachable:
+
+```sh
+curl http://localhost:6333/health
+```
+
+The MCP server should still use `QDRANT_URL=http://localhost:6334` because this project talks to Qdrant through gRPC.
+
+### 3. Use the Built MCP Binary with a Local Client
+
+For live local use, `stdio` is the recommended production client integration because the MCP client owns the child process lifecycle and communicates over stdin/stdout.
+
+Windows client config example:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "command": "D:\\projects\\index-oxide-mcp\\target\\release\\index-oxide-mcp.exe",
+      "args": ["--transport", "stdio"],
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here",
+        "QDRANT_URL": "http://localhost:6334",
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
+```
+
+Linux/macOS client config example:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "command": "/absolute/path/to/index-oxide-mcp/target/release/index-oxide-mcp",
+      "args": ["--transport", "stdio"],
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here",
+        "QDRANT_URL": "http://localhost:6334",
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}
+```
+
+After restarting the MCP client, use the `search_codebase` tool with a request like:
+
+```json
+{
+  "query": "where is the Qdrant collection created",
+  "repo": "index-oxide-mcp",
+  "limit": 5
+}
+```
+
+Optional filters supported by the current search tool include `language`, `path_prefix`, `symbol_kind`, `repo`, and `limit`.
+
+### 4. Run the Built MCP Binary as an HTTP Service
+
+Use `sse` mode when a client needs a URL-based MCP endpoint or when the server should run as a long-lived background service.
+
+Linux/macOS:
+
+```sh
+export GEMINI_API_KEY="your_gemini_api_key_here"
+export QDRANT_URL="http://localhost:6334"
+export OXI_SERVER_HOST="127.0.0.1"
+export OXI_SERVER_PORT="8754"
+./target/release/index-oxide-mcp --transport sse
+```
+
+Windows PowerShell:
+
+```powershell
+$env:GEMINI_API_KEY="your_gemini_api_key_here"
+$env:QDRANT_URL="http://localhost:6334"
+$env:OXI_SERVER_HOST="127.0.0.1"
+$env:OXI_SERVER_PORT="8754"
+.\target\release\index-oxide-mcp.exe --transport sse
+```
+
+Validate the running service:
+
+```sh
+curl http://localhost:8754/health
+```
+
+Connect URL-based MCP clients through:
+
+```text
+http://localhost:8754/mcp
+```
+
+For Kilo Code or other clients that require a stdio bridge to a URL-based MCP server, use `mcp-remote`:
+
+```json
+{
+  "index-oxide": {
+    "type": "local",
+    "command": ["npx", "-y", "mcp-remote", "http://localhost:8754/mcp"],
+    "enabled": true
+  }
+}
+```
+
+### 5. Production Operating Checklist
+
+- Keep the release binary path stable so MCP client configs do not drift.
+- Keep `GEMINI_API_KEY` out of source control; inject it through the MCP client, service manager, or secret manager.
+- Bind `OXI_SERVER_HOST=127.0.0.1` unless remote clients must connect. If remote access is required, put authentication, TLS, and firewall rules in front of the service.
+- Persist Qdrant storage with a Docker volume or host directory and back it up.
+- Monitor Qdrant HTTP health on `6333` and Index Oxide MCP health on `8754` when using HTTP mode.
+- Keep Qdrant and the MCP binary on the same trusted network. Do not expose Qdrant ports publicly without Qdrant security controls.
+- Current live MCP tool surface: `search_codebase`. Confirm indexed data exists in Qdrant before expecting search results.
+- Official Qdrant installation reference: <https://qdrant.tech/documentation/operations/installation/>
 
 ## Development
 
