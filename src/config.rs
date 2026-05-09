@@ -78,7 +78,7 @@ impl OxiConfig {
             gemini: GeminiConfig {
                 api_key,
                 model: env::var("OXI_EMBEDDING_MODEL")
-                    .unwrap_or_else(|_| "gemini-embedding-2-preview".to_string()),
+                    .unwrap_or_else(|_| "gemini-embedding-2".to_string()),
                 base_url: env::var("OXI_GEMINI_BASE_URL").unwrap_or_else(|_| {
                     "https://generativelanguage.googleapis.com/v1beta".to_string()
                 }),

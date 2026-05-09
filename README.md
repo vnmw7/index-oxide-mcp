@@ -122,7 +122,7 @@ Supported runtime environment variables:
 - `QDRANT_URL`: Optional. Defaults to `http://localhost:6334`.
 - `OXI_SERVER_HOST`: This tells the app where to bind the Streamable HTTP host, though it's entirely optional. If you ignore it, it defaults to catching traffic on 0.0.0.0.
 - `OXI_SERVER_PORT`: Optional. Streamable HTTP bind port. Defaults to `8754`.
-- `OXI_EMBEDDING_MODEL`: Optional. Defaults to `gemini-embedding-2-preview`.
+- `OXI_EMBEDDING_MODEL`: Optional. Defaults to `gemini-embedding-2`.
 - `OXI_EMBEDDING_DIMENSIONS`: Optional. Defaults to `3072`.
 
 ### 4. Choose a Transport Mode

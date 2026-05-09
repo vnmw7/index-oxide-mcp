@@ -136,7 +136,7 @@ pub async fn search_codebase(
     Ok(SearchResponse {
         results,
         total_candidates,
-        query_embedding_model: "gemini-embedding-2-preview".to_string(),
+        query_embedding_model: "gemini-embedding-2".to_string(),
     })
 }
 
