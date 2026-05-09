@@ -140,24 +140,9 @@ Use this for local clients such as Claude Desktop, Cursor, or other agentic CLIs
 
 1. Build the project once with `cargo build --release`, or use a prebuilt binary.
 2. Point your client at the compiled binary.
-3. Pass `--transport stdio` in the client config.
+3. Point your client at the binary. `stdio` is the default transport, so no transport argument is required.
 
-Example MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "index-oxide": {
-      "command": "/absolute/path/to/index-oxide-mcp",
-      "args": ["--transport", "stdio"],
-      "env": {
-        "GEMINI_API_KEY": "your_gemini_api_key_here",
-        "QDRANT_URL": "http://localhost:6334"
-      }
-    }
-  }
-}
-```
+*Configuration details for stdio clients can be found in the **Supported MCP Clients** section below.*
 
 Path examples:
 
@@ -208,22 +193,7 @@ Default SSE endpoints:
 - MCP endpoint: `http://localhost:8754/mcp`
 - Health endpoint: `http://localhost:8754/health`
 
-MCP client config for SSE mode in Kilo Code:
-
-```json
-{
-  "index-oxide": {
-    "type": "local", // Change type to local
-    "command": [
-      "npx",
-      "-y",
-      "mcp-remote", 
-      "http://localhost:8754/mcp"
-    ],
-    "enabled": true
-  }
-}
-```
+*Configuration details for SSE clients can be found in the **Supported MCP Clients** section below.*
 
 You can override the listen address with:
 
@@ -240,6 +210,228 @@ For most local users:
 3. Add the `stdio` config to your MCP client
 4. Set `GEMINI_API_KEY` in the client config
 5. Restart your MCP client
+
+## Supported MCP Clients
+
+Below are the minimum configuration schemas for popular agentic clients. Replace `/absolute/path/to/index-oxide-mcp` with the actual path to your compiled binary, and insert your real `GEMINI_API_KEY`.
+
+Use one of two integration styles:
+
+- `stdio`: the client starts the Index Oxide MCP binary and must receive `GEMINI_API_KEY` in its local server environment.
+- `sse` service mode: start Index Oxide MCP yourself with `--transport sse`, then point the client at `http://localhost:8754/mcp`.
+
+The project CLI still names the HTTP service mode `sse`, but the current implementation exposes RMCP streamable HTTP at `/mcp`. If a client distinguishes old SSE from Streamable HTTP, choose `http`, `remote`, or `Streamable HTTP` for `http://localhost:8754/mcp`.
+
+### Claude Desktop
+
+Stdio config for `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "command": "/absolute/path/to/index-oxide-mcp",
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here"
+      }
+    }
+  }
+}
+```
+
+SSE service config through `mcp-remote`:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://localhost:8754/mcp"]
+    }
+  }
+}
+```
+
+### Cursor
+
+Stdio config for `.cursor/mcp.json` or `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "type": "stdio",
+      "command": "/absolute/path/to/index-oxide-mcp",
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here"
+      }
+    }
+  }
+}
+```
+
+SSE service config for `.cursor/mcp.json` or `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "url": "http://localhost:8754/mcp"
+    }
+  }
+}
+```
+
+### Gemini CLI
+
+Stdio config for `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "command": "/absolute/path/to/index-oxide-mcp",
+      "env": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here"
+      }
+    }
+  }
+}
+```
+
+SSE service config for `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "index-oxide": {
+      "httpUrl": "http://localhost:8754/mcp"
+    }
+  }
+}
+```
+
+Gemini CLI can also write these settings for you. Use exactly one of these commands:
+
+Direct `stdio` mode, where Gemini starts the Index Oxide MCP binary and therefore must inject the required server environment:
+
+```sh
+gemini mcp add --env GEMINI_API_KEY=your_gemini_api_key_here index-oxide /absolute/path/to/index-oxide-mcp
+```
+
+HTTP service mode, where Index Oxide MCP is already running with `--transport sse`; the client only needs the `/mcp` URL:
+
+```sh
+gemini mcp add --transport http index-oxide http://localhost:8754/mcp
+```
+
+`gemini mcp add` defaults to project scope. Add `--scope user` only when you intentionally want to write the server to your global Gemini config. Do not pass `--env` to the HTTP service command unless the remote MCP server specifically requires client-side headers or auth; Index Oxide reads `GEMINI_API_KEY` from the process that runs `index-oxide-mcp --transport sse`.
+
+### OpenAI Codex
+
+Stdio config for `~/.codex/config.toml` or your project-scoped TOML:
+
+```toml
+[mcp_servers.index-oxide]
+command = "/absolute/path/to/index-oxide-mcp"
+
+[mcp_servers.index-oxide.env]
+GEMINI_API_KEY = "your_gemini_api_key_here"
+```
+
+SSE service config for `~/.codex/config.toml` or your project-scoped TOML:
+
+```toml
+[mcp_servers.index-oxide]
+url = "http://localhost:8754/mcp"
+```
+
+Codex CLI can also write these settings for you:
+
+```sh
+codex mcp add index-oxide --env GEMINI_API_KEY=your_gemini_api_key_here -- /absolute/path/to/index-oxide-mcp
+codex mcp add index-oxide --url http://localhost:8754/mcp
+```
+
+### OpenCode
+
+Stdio config for `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "index-oxide": {
+      "type": "local",
+      "command": ["/absolute/path/to/index-oxide-mcp"],
+      "environment": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here"
+      }
+    }
+  }
+}
+```
+
+SSE service config for `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "index-oxide": {
+      "type": "remote",
+      "url": "http://localhost:8754/mcp"
+    }
+  }
+}
+```
+
+### Kilo Code
+
+Stdio config for `kilo.jsonc` or `.kilo/kilo.jsonc`:
+
+```jsonc
+{
+  "mcp": {
+    "index-oxide": {
+      "type": "local",
+      "command": ["/absolute/path/to/index-oxide-mcp"],
+      "environment": {
+        "GEMINI_API_KEY": "your_gemini_api_key_here"
+      }
+    }
+  }
+}
+```
+
+SSE service config matching the `mcp-remote` bridge shape commonly written by Kilo Code:
+
+```jsonc
+{
+  "mcp": {
+    "index-oxide": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "mcp-remote",
+        "http://localhost:8754/mcp"
+      ]
+    }
+  }
+}
+```
+
+If your installed Kilo Code version supports direct remote MCP entries in the UI, the equivalent direct remote form is:
+
+```jsonc
+{
+  "mcp": {
+    "index-oxide": {
+      "type": "remote",
+      "url": "http://localhost:8754/mcp"
+    }
+  }
+}
+```
 
 ## Live / Production MCP Use
 
@@ -302,11 +494,8 @@ Windows client config example:
   "mcpServers": {
     "index-oxide": {
       "command": "D:\\projects\\index-oxide-mcp\\target\\release\\index-oxide-mcp.exe",
-      "args": ["--transport", "stdio"],
       "env": {
-        "GEMINI_API_KEY": "your_gemini_api_key_here",
-        "QDRANT_URL": "http://localhost:6334",
-        "RUST_LOG": "info"
+        "GEMINI_API_KEY": "your_gemini_api_key_here"
       }
     }
   }
@@ -320,11 +509,8 @@ Linux/macOS client config example:
   "mcpServers": {
     "index-oxide": {
       "command": "/absolute/path/to/index-oxide-mcp/target/release/index-oxide-mcp",
-      "args": ["--transport", "stdio"],
       "env": {
-        "GEMINI_API_KEY": "your_gemini_api_key_here",
-        "QDRANT_URL": "http://localhost:6334",
-        "RUST_LOG": "info"
+        "GEMINI_API_KEY": "your_gemini_api_key_here"
       }
     }
   }
@@ -379,14 +565,15 @@ Connect URL-based MCP clients through:
 http://localhost:8754/mcp
 ```
 
-For Kilo Code or other clients that require a stdio bridge to a URL-based MCP server, use `mcp-remote`:
+Use the direct remote client config from the **Supported MCP Clients** section when your client supports Streamable HTTP. For stdio-only clients, or for Kilo Code setups that use the same bridge shape shown above, bridge the running HTTP service with `mcp-remote`:
 
 ```json
 {
-  "index-oxide": {
-    "type": "local",
-    "command": ["npx", "-y", "mcp-remote", "http://localhost:8754/mcp"],
-    "enabled": true
+  "mcpServers": {
+    "index-oxide": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://localhost:8754/mcp"]
+    }
   }
 }
 ```
