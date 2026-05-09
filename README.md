@@ -71,6 +71,40 @@ docker run -d --name oxi-qdrant `
   qdrant/qdrant
 ```
 
+If you do not want to use Docker, download Qdrant directly from the official GitHub releases page, extract the archive, and run the `qdrant` executable. The `/latest/download/` links below track the current stable release:
+
+- Linux x86_64: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-x86_64-unknown-linux-musl.tar.gz>
+- Linux ARM64: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-aarch64-unknown-linux-musl.tar.gz>
+- macOS Apple Silicon: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-aarch64-apple-darwin.tar.gz>
+- macOS Intel: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-x86_64-apple-darwin.tar.gz>
+- Windows x86_64: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-x86_64-pc-windows-msvc.zip>
+
+Linux/macOS after extracting:
+
+```sh
+./qdrant
+```
+
+Windows PowerShell after extracting:
+
+```powershell
+.\qdrant.exe
+```
+
+For easier Windows startup, place `qdrant.exe` in the project root and run the included PowerShell launcher:
+
+```powershell
+.\start-qdrant.ps1
+```
+
+The script runs the equivalent of:
+
+```powershell
+$env:QDRANT__STORAGE__STORAGE_PATH=".\qdrant_data"; .\qdrant.exe
+```
+
+When using the launcher, Qdrant stores data in `./qdrant_data`. Without the launcher, Qdrant's default local quickstart storage path is `./qdrant_storage`. In both cases, Qdrant exposes REST on `6333` plus gRPC on `6334`, so keep `QDRANT_URL=http://localhost:6334` for Index Oxide MCP.
+
 Qdrant ports used by this project:
 
 - `6334`: gRPC. Index Oxide MCP uses this through `QDRANT_URL`.
