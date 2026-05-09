@@ -30,17 +30,47 @@ use rmcp::transport::streamable_http_server::{
 use rmcp::ServiceExt;
 use std::sync::Arc;
 use tracing::info;
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize tracing to stderr (stdout is used for MCP stdio transport)
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
+    // Initialize tracing
+    // Files are saved in the same directory as the executable
+    let log_dir = std::env::current_exe()?
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let file_appender = RollingFileAppender::builder()
+        .rotation(Rotation::DAILY)
+        .filename_prefix("index-oxide-mcp")
+        .filename_suffix("log")
+        .build(log_dir)
+        .expect("Failed to initialize rolling file appender");
+
+    // Use non-blocking writer for performance
+    // The _guard must remain in scope for the duration of the program to ensure logs are flushed
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    // Separate layers for stderr (human-readable) and file (JSON)
+    let stderr_layer = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
         .with_target(false)
+        .with_filter(filter.clone());
+
+    let file_layer = tracing_subscriber::fmt::layer()
+        .with_writer(non_blocking)
+        .json()
+        .with_ansi(false)
+        .with_filter(filter);
+
+    tracing_subscriber::registry()
+        .with(stderr_layer)
+        .with(file_layer)
         .init();
 
     info!("oxidized-index-mcp starting");
