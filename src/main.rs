@@ -10,6 +10,7 @@ mod config;
 mod errors;
 mod gemini;
 mod jobs;
+mod manage;
 mod mcp_server;
 mod models;
 mod pipeline;
@@ -107,62 +108,68 @@ async fn main() -> anyhow::Result<()> {
 
     let args = cli::CliArgs::parse();
 
-    match args.transport {
-        cli::TransportMode::Stdio => {
-            // Create MCP server
-            let server = OxiServer::new(
-                Arc::clone(&config_arc),
-                Arc::clone(&gemini_arc),
-                Arc::clone(&qdrant_arc),
-                Arc::clone(&jobs_arc),
-            );
+    match args.command {
+        cli::Commands::Serve { transport } => match transport {
+            cli::TransportMode::Stdio => {
+                // Create MCP server
+                let server = InxeServer::new(
+                    Arc::clone(&config_arc),
+                    Arc::clone(&gemini_arc),
+                    Arc::clone(&qdrant_arc),
+                    Arc::clone(&jobs_arc),
+                );
 
-            info!("Starting MCP server on stdio transport");
+                info!("Starting MCP server on stdio transport");
 
-            // Start MCP server on stdio
-            let transport = (tokio::io::stdin(), tokio::io::stdout());
-            let running_server = server
-                .serve(transport)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to start MCP server: {}", e))?;
+                // Start MCP server on stdio
+                let transport = (tokio::io::stdin(), tokio::io::stdout());
+                let running_server = server
+                    .serve(transport)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to start MCP server: {}", e))?;
 
-            // Wait for the server to finish (runs until the transport closes)
-            running_server
-                .waiting()
-                .await
-                .map_err(|e| anyhow::anyhow!("MCP server error: {}", e))?;
-        }
-        cli::TransportMode::StreamableHttp => {
-            let mcp_service = StreamableHttpService::new(
-                {
-                    let config_arc = Arc::clone(&config_arc);
-                    let gemini = Arc::clone(&gemini_arc);
-                    let qdrant = Arc::clone(&qdrant_arc);
-                    let jobs = Arc::clone(&jobs_arc);
-                    move || {
-                        Ok(OxiServer::new(
-                            Arc::clone(&config_arc),
-                            Arc::clone(&gemini),
-                            Arc::clone(&qdrant),
-                            Arc::clone(&jobs),
-                        ))
-                    }
-                },
-                LocalSessionManager::default().into(),
-                Default::default(),
-            );
+                // Wait for the server to finish (runs until the transport closes)
+                running_server
+                    .waiting()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("MCP server error: {}", e))?;
+            }
+            cli::TransportMode::StreamableHttp => {
+                let mcp_service = StreamableHttpService::new(
+                    {
+                        let config_arc = Arc::clone(&config_arc);
+                        let gemini = Arc::clone(&gemini_arc);
+                        let qdrant = Arc::clone(&qdrant_arc);
+                        let jobs = Arc::clone(&jobs_arc);
+                        move || {
+                            Ok(InxeServer::new(
+                                Arc::clone(&config_arc),
+                                Arc::clone(&gemini),
+                                Arc::clone(&qdrant),
+                                Arc::clone(&jobs),
+                            ))
+                        }
+                    },
+                    LocalSessionManager::default().into(),
+                    Default::default(),
+                );
 
-            let app = Router::new()
-                .nest_service("/mcp", mcp_service)
-                .route("/health", axum::routing::get(|| async { "ok" }));
+                let app = Router::new()
+                    .nest_service("/mcp", mcp_service)
+                    .route("/health", axum::routing::get(|| async { "ok" }));
 
-            let addr = format!("{}:{}", config_arc.server.host, config_arc.server.port);
-            let listener = tokio::net::TcpListener::bind(&addr).await?;
-            info!(address = %addr, "MCP Streamable HTTP server listening");
-            axum::serve(listener, app).await?;
+                let addr = format!("{}:{}", config_arc.server.host, config_arc.server.port);
+                let listener = tokio::net::TcpListener::bind(&addr).await?;
+                info!(address = %addr, "MCP Streamable HTTP server listening");
+                axum::serve(listener, app).await?;
+            }
+        },
+        cli::Commands::Manage => {
+            info!("Starting TUI manager");
+            manage::run_tui(config_arc, gemini_arc, qdrant_arc, jobs_arc).await?;
         }
     }
 
-    info!("oxidized-index-mcp shutting down");
+    info!("inxe-index-mcp shutting down");
     Ok(())
 }
