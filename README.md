@@ -211,6 +211,18 @@ For most local users:
 4. Set `GEMINI_API_KEY` in the client config
 5. Restart your MCP client
 
+## Testing and Debugging with MCP Inspector
+
+Use the official MCP Inspector when you want an interactive test UI for connection checks, capability negotiation, tool listing, request payload testing, and protocol-level debugging. It runs through `npx` without adding a project dependency.
+
+Official reference: <https://modelcontextprotocol.io/docs/tools/inspector>
+
+Windows PowerShell:
+
+```powershell
+npx -y @modelcontextprotocol/inspector
+```
+
 ## Supported MCP Clients
 
 Below are the minimum configuration schemas for popular agentic clients. Replace `/absolute/path/to/index-oxide-mcp` with the actual path to your compiled binary, and insert your real `GEMINI_API_KEY`.
@@ -251,22 +263,6 @@ Streamable HTTP service config for `~/.gemini/settings.json`:
 }
 ```
 
-Gemini CLI can also write these settings for you. Use exactly one of these commands:
-
-Direct `stdio` mode, where Gemini starts the Index Oxide MCP binary and therefore must inject the required server environment:
-
-```sh
-gemini mcp add --env GEMINI_API_KEY=your_gemini_api_key_here index-oxide /absolute/path/to/index-oxide-mcp
-```
-
-HTTP service mode, where Index Oxide MCP is already running with `--transport streamable-http`; the client only needs the `/mcp` URL:
-
-```sh
-gemini mcp add --transport http index-oxide http://localhost:8754/mcp
-```
-
-`gemini mcp add` defaults to project scope. Add `--scope user` only when you intentionally want to write the server to your global Gemini config. Do not pass `--env` to the HTTP service command unless the remote MCP server specifically requires client-side headers or auth; Index Oxide reads `GEMINI_API_KEY` from the process that runs `index-oxide-mcp --transport streamable-http`.
-
 ### Kilo Code
 
 Streamable HTTP service config matching the `mcp-remote` bridge shape commonly written by Kilo Code:
@@ -282,19 +278,6 @@ Streamable HTTP service config matching the `mcp-remote` bridge shape commonly w
         "mcp-remote",
         "http://localhost:8754/mcp"
       ]
-    }
-  }
-}
-```
-
-If your installed Kilo Code version supports direct remote MCP entries in the UI, the equivalent direct remote form is:
-
-```jsonc
-{
-  "mcp": {
-    "index-oxide": {
-      "type": "remote",
-      "url": "http://localhost:8754/mcp"
     }
   }
 }
