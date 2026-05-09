@@ -35,7 +35,7 @@ pub async fn search_codebase(
     // Step 3: Vector search in Qdrant
     // Fetch more candidates than needed for reranking
     let fetch_limit = (limit * 3).min(100);
-    let scored_points = qdrant
+    let scored_points: Vec<qdrant_client::qdrant::ScoredPoint> = qdrant
         .query_chunks(&collection_name, query_embedding, fetch_limit, filter)
         .await?;
 

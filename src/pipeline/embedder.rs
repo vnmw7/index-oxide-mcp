@@ -114,7 +114,7 @@ async fn process_batch(
 
     // 1. Check Cache: Try to find existing embeddings by content_hash
     let hashes: Vec<String> = batch.iter().map(|c| c.content_hash.clone()).collect();
-    let cached_embeddings = match ctx
+    let cached_embeddings: HashMap<String, Vec<f32>> = match ctx
         .qdrant
         .get_embeddings_by_hashes(&ctx.collection_name, &hashes)
         .await

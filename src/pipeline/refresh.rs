@@ -52,7 +52,7 @@ pub async fn refresh_index(
         let changed_files = Arc::clone(&changed_files);
         let filter = Arc::clone(&filter);
         let root = root_path_buf.clone();
-        let indexed = Arc::clone(&indexed_metadata_arc);
+        let indexed: Arc<HashMap<String, (String, u64, String)>> = Arc::clone(&indexed_metadata_arc);
 
         Box::new(move |entry| {
             let entry = match entry {

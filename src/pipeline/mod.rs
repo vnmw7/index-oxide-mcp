@@ -121,9 +121,9 @@ pub async fn run_pipeline(
             chunk_rx,
             embedded_tx,
             &embed_job,
-            &embed_config,
-            &embed_gemini,
-            &embed_qdrant,
+            embed_config,
+            embed_gemini,
+            embed_qdrant,
         )
         .await;
     });
