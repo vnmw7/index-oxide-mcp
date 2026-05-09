@@ -8,11 +8,11 @@ Index Oxide MCP is a high-throughput MCP (Model Context Protocol) codebase index
 - **High-throughput Indexing:** Concurrently walks and indexes large codebases.
 - **Tree-sitter Parsing:** Precise syntax tree extraction for multiple languages (Rust, Python, TS, Go).
 - **Vector Search:** Semantically retrieves code blocks using Qdrant.
-- **MCP Server:** Dual-mode support (SSE Web Server and stdio) via the native `rmcp` SDK.
+- **MCP Server:** Dual-mode support (Streamable HTTP and Stdio) via the native `rmcp` SDK.
 
 ## Setup & Deployment
 
-Index Oxide MCP is designed to run natively as a standalone binary alongside a containerized Qdrant database. You can choose to download a pre-built binary or compile it from source. The server supports dual-transport modes: Stdio (standard I/O) and SSE (HTTP).
+Index Oxide MCP is designed to run natively as a standalone binary alongside a containerized Qdrant database. You can choose to download a pre-built binary or compile it from source. The server supports dual-transport modes: Stdio (standard I/O) and Streamable HTTP (historically called SSE).
 
 ### Prerequisites
 - **Docker**: Required to run the Qdrant vector database.
@@ -120,8 +120,8 @@ Supported runtime environment variables:
 
 - `GEMINI_API_KEY`: Required. Google Gemini API key.
 - `QDRANT_URL`: Optional. Defaults to `http://localhost:6334`.
-- `OXI_SERVER_HOST`: This tells the app where to bind the SSE host, though it's entirely optional. If you ignore it, it defaults to catching traffic on 0.0.0.0.
-- `OXI_SERVER_PORT`: Optional. SSE bind port. Defaults to `8754`.
+- `OXI_SERVER_HOST`: This tells the app where to bind the Streamable HTTP host, though it's entirely optional. If you ignore it, it defaults to catching traffic on 0.0.0.0.
+- `OXI_SERVER_PORT`: Optional. Streamable HTTP bind port. Defaults to `8754`.
 - `OXI_EMBEDDING_MODEL`: Optional. Defaults to `gemini-embedding-2-preview`.
 - `OXI_EMBEDDING_DIMENSIONS`: Optional. Defaults to `3072`.
 

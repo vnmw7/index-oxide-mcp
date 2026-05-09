@@ -102,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
                 .await
                 .map_err(|e| anyhow::anyhow!("MCP server error: {}", e))?;
         }
-        cli::TransportMode::Sse => {
+        cli::TransportMode::StreamableHttp => {
             let mcp_service = StreamableHttpService::new(
                 {
                     let config_arc = Arc::clone(&config_arc);
@@ -128,7 +128,7 @@ async fn main() -> anyhow::Result<()> {
 
             let addr = format!("{}:{}", config_arc.server.host, config_arc.server.port);
             let listener = tokio::net::TcpListener::bind(&addr).await?;
-            info!(address = %addr, "MCP SSE server listening");
+            info!(address = %addr, "MCP Streamable HTTP server listening");
             axum::serve(listener, app).await?;
         }
     }

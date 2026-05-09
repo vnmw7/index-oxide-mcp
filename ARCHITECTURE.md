@@ -13,7 +13,7 @@ The system consists of two primary components:
 
 ```mermaid
 graph TD
-    Client[MCP Client / IDE] <-->|SSE / HTTP| Server[Oxi-MCP Server]
+    Client[MCP Client / IDE] <-->|Streamable HTTP| Server[Oxi-MCP Server]
     Server <-->|gRPC| Qdrant[Qdrant Vector DB (Docker)]
     Server -->|HTTPS| Gemini[Google Gemini API]
     Server <-->|Native FS| SourceCode[Local Source Code]
@@ -24,7 +24,7 @@ graph TD
 ### 1. Dual-Transport Layer
 The server supports two primary transport modes for communication with MCP clients:
 - **Stdio Transport**: Standard stdin/stdout communication for local integrations, which is typically the primary way IDEs like Cursor or Claude Desktop start and interact with the MCP server natively.
-- **SSE (Server-Sent Events) Transport**: A robust HTTP-based transport layer using `axum`. This is useful for standalone shared indexing servers or setups where the client requires connecting over an HTTP network boundary.
+- **Streamable HTTP Transport**: A robust HTTP-based transport layer using `axum`. This is useful for standalone shared indexing servers or setups where the client requires connecting over an HTTP network boundary. It is often referred to as SSE in some contexts but follows the modern MCP Streamable HTTP specification.
 
 ### 2. Vector Database (Qdrant)
 - **Communication**: The MCP server communicates with Qdrant via high-speed **gRPC** (Port 6334).

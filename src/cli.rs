@@ -10,7 +10,7 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(name = "index-oxide-mcp", version, about)]
 pub struct CliArgs {
-    /// Transport mode: "stdio" for local MCP clients, "sse" for HTTP/SSE deployment.
+    /// Transport mode: "stdio" for local MCP clients, "sse" for Streamable HTTP deployment.
     #[arg(long, default_value = "stdio")]
     pub transport: TransportMode,
 }
@@ -19,6 +19,6 @@ pub struct CliArgs {
 pub enum TransportMode {
     /// Standard I/O transport (stdin/stdout) — for local MCP client spawning
     Stdio,
-    /// Streamable HTTP transport (SSE) — for network/Docker deployment
-    Sse,
+    /// Streamable HTTP transport (often called SSE) — for network/Docker deployment
+    StreamableHttp,
 }
