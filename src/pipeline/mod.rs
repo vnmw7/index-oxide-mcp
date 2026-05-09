@@ -1,6 +1,6 @@
 /*
- * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/pipeline/mod.rs
+ * System: Inxe Index MCP
+ * File URL: inxe-index-mcp/src/pipeline/mod.rs
  * Purpose: Pipeline orchestrator that wires discovery → parse → embed → index stages with bounded channels
  */
 
@@ -12,11 +12,11 @@ pub mod indexer;
 pub mod parser;
 pub mod refresh;
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::gemini::client::GeminiClient;
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::{IndexJob, JobStage};
-use crate::qdrant::client::OxiQdrantClient;
+use crate::qdrant::client::InxeQdrantClient;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -33,13 +33,13 @@ pub struct PipelineOptions {
 
 /// Run the full indexing pipeline for a repository.
 pub async fn run_pipeline(
-    config: Arc<OxiConfig>,
+    config: Arc<InxeConfig>,
     gemini: Arc<GeminiClient>,
-    qdrant: Arc<OxiQdrantClient>,
+    qdrant: Arc<InxeQdrantClient>,
     job: Arc<IndexJob>,
     options: PipelineOptions,
 ) -> anyhow::Result<()> {
-    let collection_name = qdrant.ensure_collection(&job.repo_name).await?;
+    let collection_name: String = qdrant.ensure_collection(&job.repo_name).await?;
 
     // Create bounded channels between pipeline stages
     let (discovery_tx, discovery_rx) =

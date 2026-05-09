@@ -1,10 +1,10 @@
 /*
- * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/pipeline/discovery.rs
+ * System: Inxe Index MCP
+ * File URL: inxe-index-mcp/src/pipeline/discovery.rs
  * Purpose: Stage A - .gitignore-aware file discovery using the ignore crate
  */
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::models::job::IndexJob;
 use crate::pipeline::filters::{self, FilterResult};
 use ignore::WalkState;
@@ -20,7 +20,7 @@ pub async fn discover_files(
     root: &Path,
     tx: mpsc::Sender<PathBuf>,
     job: &Arc<IndexJob>,
-    config: &Arc<OxiConfig>,
+    config: &Arc<InxeConfig>,
     include_globs: Option<Vec<String>>,
     exclude_globs: Option<Vec<String>>,
 ) -> anyhow::Result<()> {
@@ -97,7 +97,7 @@ pub async fn discover_files(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::OxiConfig;
+    use crate::config::InxeConfig;
     use crate::models::job::IndexJob;
     use std::fs;
     use std::sync::Arc;
@@ -126,12 +126,12 @@ mod tests {
             root.to_string_lossy().to_string(),
             "test-repo".to_string(),
         ));
-        let config = Arc::new(OxiConfig::from_env().unwrap_or_else(|_| {
+        let config = Arc::new(InxeConfig::from_env().unwrap_or_else(|_| {
             // Minimal config for testing if env is missing
             unsafe {
                 std::env::set_var("GEMINI_API_KEY", "dummy");
             }
-            OxiConfig::from_env().unwrap()
+            InxeConfig::from_env().unwrap()
         }));
 
         let (tx, mut rx) = mpsc::channel(10);
@@ -171,11 +171,11 @@ mod tests {
             root.to_string_lossy().into(),
             "test".into(),
         ));
-        let config = Arc::new(OxiConfig::from_env().unwrap_or_else(|_| {
+        let config = Arc::new(InxeConfig::from_env().unwrap_or_else(|_| {
             unsafe {
                 std::env::set_var("GEMINI_API_KEY", "dummy");
             }
-            OxiConfig::from_env().unwrap()
+            InxeConfig::from_env().unwrap()
         }));
 
         // Test include globs

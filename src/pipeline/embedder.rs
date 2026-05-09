@@ -1,16 +1,17 @@
 /*
- * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/pipeline/embedder.rs
+ * System: Inxe Index MCP
+ * File URL: inxe-index-mcp/src/pipeline/embedder.rs
  * Purpose: Stage C - Adaptive batch embedding via Gemini API with concurrency control and caching
  */
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::gemini::client::{EmbedInput, GeminiClient};
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::IndexJob;
-use crate::qdrant::client::OxiQdrantClient;
+use crate::qdrant::client::InxeQdrantClient;
 use crate::util::hashing::build_collection_name;
 use chrono::Utc;
+use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Semaphore};
@@ -20,7 +21,7 @@ use tracing::{debug, error, warn};
 struct EmbedBatchContext {
     job: Arc<IndexJob>,
     gemini: Arc<GeminiClient>,
-    qdrant: Arc<OxiQdrantClient>,
+    qdrant: Arc<InxeQdrantClient>,
     collection_name: String,
     max_retries: u32,
     model: String,
@@ -32,9 +33,9 @@ pub async fn run_embedder(
     mut rx: mpsc::Receiver<CodeChunk>,
     tx: mpsc::Sender<EmbeddedChunk>,
     job: &Arc<IndexJob>,
-    config: &Arc<OxiConfig>,
-    gemini: &Arc<GeminiClient>,
-    qdrant: &Arc<OxiQdrantClient>,
+    config: Arc<InxeConfig>,
+    gemini: Arc<GeminiClient>,
+    qdrant: Arc<InxeQdrantClient>,
 ) {
     let semaphore = Arc::new(Semaphore::new(config.pipeline.embed_concurrency));
     let max_tokens = config.pipeline.embed_batch_max_tokens;

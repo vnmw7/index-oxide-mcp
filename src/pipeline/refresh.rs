@@ -1,14 +1,14 @@
 /*
- * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/pipeline/refresh.rs
+ * System: Inxe Index MCP
+ * File URL: inxe-index-mcp/src/pipeline/refresh.rs
  * Purpose: Incremental refresh - detect changed/deleted files and selectively re-index
  */
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::gemini::client::GeminiClient;
 use crate::models::search::RefreshResponse;
 use crate::pipeline::filters::{self, FilterResult};
-use crate::qdrant::client::OxiQdrantClient;
+use crate::qdrant::client::InxeQdrantClient;
 use crate::util::hashing::build_collection_name;
 use ignore::WalkState;
 use std::collections::HashMap;
@@ -21,16 +21,16 @@ use tracing::{debug, info, warn};
 pub async fn refresh_index(
     root_path: &Path,
     repo_name: &str,
-    config: &Arc<OxiConfig>,
+    config: &Arc<InxeConfig>,
     gemini: &Arc<GeminiClient>,
-    qdrant: &Arc<OxiQdrantClient>,
+    qdrant: &Arc<InxeQdrantClient>,
     include_globs: Option<Vec<String>>,
     exclude_globs: Option<Vec<String>>,
 ) -> anyhow::Result<RefreshResponse> {
     let collection_name = build_collection_name(repo_name);
 
     // Get all currently indexed paths and their metadata
-    let indexed_metadata = qdrant.get_indexed_metadata(&collection_name).await?;
+    let indexed_metadata: HashMap<String, (String, u64, String)> = qdrant.get_indexed_metadata(&collection_name).await?;
     info!(
         indexed_count = indexed_metadata.len(),
         "Loaded indexed file metadata for refresh"

@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 /*
- * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/main.rs
- * Purpose: Entry point - initializes tracing, loads config, starts MCP server on stdio transport
+ * System: Inxe Index MCP
+ * File URL: inxe-index-mcp/src/main.rs
+ * Purpose: Entry point - initializes tracing, loads config, and routes to MCP server or TUI manager
  */
 
 mod cli;
@@ -17,11 +17,11 @@ mod qdrant;
 mod search;
 mod util;
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::gemini::client::GeminiClient;
 use crate::jobs::registry::JobRegistry;
-use crate::mcp_server::OxiServer;
-use crate::qdrant::client::OxiQdrantClient;
+use crate::mcp_server::InxeServer;
+use crate::qdrant::client::InxeQdrantClient;
 use axum::Router;
 use clap::Parser;
 use rmcp::transport::streamable_http_server::{
@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
 
     let file_appender = RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
-        .filename_prefix("index-oxide-mcp")
+        .filename_prefix("inxe-index-mcp")
         .filename_suffix("log")
         .build(log_dir)
         .expect("Failed to initialize rolling file appender");
@@ -73,10 +73,10 @@ async fn main() -> anyhow::Result<()> {
         .with(file_layer)
         .init();
 
-    info!("oxidized-index-mcp starting");
+    info!("inxe-index-mcp starting");
 
     // Load configuration from environment
-    let config = OxiConfig::from_env()?;
+    let config = InxeConfig::from_env()?;
     info!(
         model = %config.gemini.model,
         dimensions = config.embedding.dimensions,
@@ -91,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Initialize Qdrant client
-    let qdrant = Arc::new(OxiQdrantClient::new(
+    let qdrant = Arc::new(InxeQdrantClient::new(
         &config.qdrant,
         config.embedding.dimensions,
     )?);

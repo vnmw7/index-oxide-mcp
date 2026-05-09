@@ -1,6 +1,6 @@
 /*
- * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/qdrant/client.rs
+ * System: Inxe Index MCP
+ * File URL: inxe-index-mcp/src/qdrant/client.rs
  * Purpose: Qdrant vector DB client wrapper for collection management, upsert, query, and delete
  */
 
@@ -17,13 +17,13 @@ use qdrant_client::Qdrant;
 use serde_json::json;
 use tracing::{debug, info, warn};
 
-/// Wrapper around the Qdrant gRPC client for oxidized-index-mcp operations.
-pub struct OxiQdrantClient {
+/// Wrapper around the Qdrant gRPC client for inxe-index-mcp operations.
+pub struct InxeQdrantClient {
     client: Qdrant,
     dimensions: u32,
 }
 
-impl OxiQdrantClient {
+impl InxeQdrantClient {
     /// Connect to Qdrant via gRPC.
     pub fn new(config: &QdrantConfig, dimensions: u32) -> Result<Self, StorageError> {
         let client = Qdrant::from_url(&config.url)
@@ -257,8 +257,8 @@ impl OxiQdrantClient {
         Ok(())
     }
 
-    /// List all collections matching the oxi_ prefix.
-    pub async fn list_oxi_collections(&self) -> Result<Vec<String>, StorageError> {
+    /// List all collections matching the inxe_ prefix.
+    pub async fn list_inxe_collections(&self) -> Result<Vec<String>, StorageError> {
         let collections = self
             .client
             .list_collections()
@@ -268,7 +268,7 @@ impl OxiQdrantClient {
         Ok(collections
             .collections
             .into_iter()
-            .filter(|c| c.name.starts_with("oxi_"))
+            .filter(|c| c.name.starts_with("inxe_"))
             .map(|c| c.name)
             .collect())
     }

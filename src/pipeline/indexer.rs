@@ -1,13 +1,13 @@
 /*
- * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/pipeline/indexer.rs
+ * System: Inxe Index MCP
+ * File URL: inxe-index-mcp/src/pipeline/indexer.rs
  * Purpose: Stage D - Batch upsert embedded chunks into Qdrant with retry and backpressure
  */
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::models::chunk::EmbeddedChunk;
 use crate::models::job::IndexJob;
-use crate::qdrant::client::OxiQdrantClient;
+use crate::qdrant::client::InxeQdrantClient;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,8 +19,8 @@ use tracing::{debug, error, warn};
 pub async fn run_indexer(
     mut rx: mpsc::Receiver<EmbeddedChunk>,
     job: &Arc<IndexJob>,
-    config: &Arc<OxiConfig>,
-    qdrant: &Arc<OxiQdrantClient>,
+    config: &Arc<InxeConfig>,
+    qdrant: &Arc<InxeQdrantClient>,
     collection_name: &str,
 ) {
     let batch_size = config.pipeline.index_batch_size;
@@ -96,7 +96,7 @@ pub async fn run_indexer(
 async fn upsert_batch(
     batch: Vec<EmbeddedChunk>,
     job: Arc<IndexJob>,
-    qdrant: Arc<OxiQdrantClient>,
+    qdrant: Arc<InxeQdrantClient>,
     collection_name: String,
     max_retries: u32,
 ) {
