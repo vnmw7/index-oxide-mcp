@@ -9,19 +9,21 @@ Index Oxide MCP is a high-throughput MCP (Model Context Protocol) codebase index
 - **Tree-sitter Parsing:** Precise syntax tree extraction for multiple languages (Rust, Python, TS, Go).
 - **Vector Search:** Semantically retrieves code blocks using Qdrant.
 - **MCP Server:** Dual-mode support (Streamable HTTP and Stdio) via the native `rmcp` SDK.
+- **Interactive Index Manager:** Terminal UI for starting index jobs and viewing indexed repositories.
 
 ## Setup & Deployment
 
-Index Oxide MCP is designed to run natively as a standalone binary alongside a containerized Qdrant database. You can choose to download a pre-built binary or compile it from source. The server supports dual-transport modes: Stdio (standard I/O) and Streamable HTTP.
+Index Oxide MCP is designed to run natively as a standalone binary alongside a containerized Qdrant database. You can choose to download a pre-built binary or compile it from source. The binary has two top-level subcommands:
+
+- `serve`: starts the MCP server. This is the command to use from MCP clients and supports Stdio plus Streamable HTTP transports.
+- `manage`: opens the interactive terminal index manager for starting index jobs and viewing indexed repositories.
 
 ### Prerequisites
-- **Docker**: Required to run the Qdrant vector database.
-- **Gemini API key**: Required. Set via `GEMINI_API_KEY`.
-- **Index Oxide MCP Binary**: Either download the pre-built binary for your OS from the releases page or install [Rust](https://rustup.rs/) to compile from source.
+???
 
 ### 1. Build the Binary
 
-The server is compiled as a single binary. You do not need separate builds for `stdio` and `streamable-http`.
+The project compiles as a single binary. You do not need separate builds for the `serve` and `manage` subcommands, and you do not need separate builds for `stdio` and `streamable-http`.
 
 ```sh
 cargo build --release
@@ -32,58 +34,8 @@ Binary locations after a successful build:
 - Linux/macOS: `./target/release/index-oxide-mcp`
 - Windows: `.\target\release\index-oxide-mcp.exe`
 
-### 2. Start the Database
-The easiest way to start the Qdrant database is using Docker Compose. Run the following command in the project root:
-
-```sh
-docker-compose up -d
-```
-
-By default, the server expects Qdrant at `http://localhost:6334`, which matches [`docker-compose.yml`](./docker-compose.yml).
-
-If you want to download and run the Qdrant image directly instead of using the repository compose file, pull the official image first:
-
-```sh
-docker pull qdrant/qdrant
-```
-
-Linux/macOS:
-
-```sh
-mkdir -p ./qdrant_storage
-docker run -d --name oxi-qdrant \
-  --restart unless-stopped \
-  -p 6333:6333 \
-  -p 6334:6334 \
-  -v "$(pwd)/qdrant_storage:/qdrant/storage" \
-  qdrant/qdrant
-```
-
-Windows PowerShell:
-
-```powershell
-New-Item -ItemType Directory -Force .\qdrant_storage | Out-Null
-docker run -d --name oxi-qdrant `
-  --restart unless-stopped `
-  -p 6333:6333 `
-  -p 6334:6334 `
-  -v "${PWD}/qdrant_storage:/qdrant/storage" `
-  qdrant/qdrant
-```
-
-If you do not want to use Docker, download Qdrant directly from the official GitHub releases page, extract the archive, and run the `qdrant` executable. The `/latest/download/` links below track the current stable release:
-
-- Linux x86_64: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-x86_64-unknown-linux-musl.tar.gz>
-- Linux ARM64: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-aarch64-unknown-linux-musl.tar.gz>
-- macOS Apple Silicon: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-aarch64-apple-darwin.tar.gz>
-- macOS Intel: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-x86_64-apple-darwin.tar.gz>
-- Windows x86_64: <https://github.com/qdrant/qdrant/releases/latest/download/qdrant-x86_64-pc-windows-msvc.zip>
-
-Linux/macOS after extracting:
-
-```sh
-./qdrant
-```
+### 2. Start the Qdrant Database
+Download Qdrant directly from the official GitHub releases page, extract the archive, and run the `qdrant` executable. The `/latest/download/` links below track the current stable release:
 
 Windows PowerShell after extracting:
 
@@ -113,26 +65,16 @@ Qdrant ports used by this project:
 Production note: Qdrant's official documentation recommends managed Qdrant Cloud, Kubernetes, or a carefully operated Docker/Compose deployment for production. If you self-host with Docker/Compose, use persistent SSD/NVMe-backed storage, restrict network access, configure security settings, and plan backup/restore, monitoring, and upgrades.
 
 ### 3. Configure Environment Variables
-
-Only `GEMINI_API_KEY` is required. Everything else has defaults.
-
-Supported runtime environment variables:
-
-- `GEMINI_API_KEY`: Required. Google Gemini API key.
-- `QDRANT_URL`: Optional. Defaults to `http://localhost:6334`.
-- `OXI_SERVER_HOST`: This tells the app where to bind the Streamable HTTP host, though it's entirely optional. If you ignore it, it defaults to catching traffic on 0.0.0.0.
-- `OXI_SERVER_PORT`: Optional. Streamable HTTP bind port. Defaults to `8754`.
-- `OXI_EMBEDDING_MODEL`: Optional. Defaults to `gemini-embedding-2`.
-- `OXI_EMBEDDING_DIMENSIONS`: Optional. Defaults to `3072`.
+???
 
 ### 4. Choose a Transport Mode
 
-The same binary supports both transport modes at runtime:
+Use the `serve` subcommand when running the MCP server. `serve` supports both transport modes at runtime:
 
 - `stdio`: Best for local MCP clients that launch the server themselves.
 - `streamable-http`: Best when you want to run the server as a background HTTP service.
 
-If you do not pass `--transport`, the default is `stdio`.
+If you run `serve` without `--transport`, the default is `stdio`.
 
 #### Mode A: `stdio` Transport
 
@@ -140,7 +82,7 @@ Use this for local clients such as Claude Desktop, Cursor, or other agentic CLIs
 
 1. Build the project once with `cargo build --release`, or use a prebuilt binary.
 2. Point your client at the compiled binary.
-3. Point your client at the binary. `stdio` is the default transport, so no transport argument is required.
+3. Configure the client to pass `serve` as the first argument. `stdio` is the default transport inside `serve`, so no transport argument is required.
 
 *Configuration details for stdio clients can be found in the **Supported MCP Clients** section below.*
 
@@ -153,6 +95,7 @@ Notes:
 
 - Keep logs on `stderr`; MCP traffic uses `stdin`/`stdout` in this mode.
 - `stdio` is the recommended default for local desktop agents.
+- The direct terminal equivalent is `./target/release/index-oxide-mcp serve` on Linux/macOS or `.\target\release\index-oxide-mcp.exe serve` on Windows.
 
 #### Mode B: `streamable-http` Transport
 
@@ -160,32 +103,8 @@ Use this when you want to run Index Oxide MCP as a standalone HTTP service and c
 
 Start the server from your terminal.
 
-Linux/macOS:
-
-```sh
-export GEMINI_API_KEY="your_api_key_here"
-export QDRANT_URL="http://localhost:6334"
-./target/release/index-oxide-mcp --transport streamable-http
-```
-
-One-line alternative:
-
-```sh
-GEMINI_API_KEY="your_api_key_here" QDRANT_URL="http://localhost:6334" ./target/release/index-oxide-mcp --transport streamable-http
-```
-
-Windows PowerShell:
-
 ```powershell
-$env:GEMINI_API_KEY="your_api_key_here"
-$env:QDRANT_URL="http://localhost:6334"
-.\target\release\index-oxide-mcp.exe --transport streamable-http
-```
-
-One-line alternative:
-
-```powershell
-$env:GEMINI_API_KEY="your_api_key_here"; $env:QDRANT_URL="http://localhost:6334"; .\target\release\index-oxide-mcp.exe --transport streamable-http
+$env:GEMINI_API_KEY="your_api_key_here"; $env:QDRANT_URL="http://localhost:6334"; .\index-oxide-mcp.exe serve --transport streamable-http
 ```
 
 Default Streamable HTTP endpoints:
@@ -195,21 +114,17 @@ Default Streamable HTTP endpoints:
 
 *Configuration details for Streamable HTTP clients can be found in the **Supported MCP Clients** section below.*
 
-You can override the listen address with:
+#### Mode C: `manage` Interactive TUI
 
-```sh
-OXI_SERVER_HOST=127.0.0.1 OXI_SERVER_PORT=8754 ./target/release/index-oxide-mcp --transport streamable-http
+Use `manage` when you want a terminal UI for index operations instead of connecting through an MCP client. The TUI uses the same `GEMINI_API_KEY`, `QDRANT_URL`, and embedding configuration as the MCP server.
+
+Windows PowerShell:
+
+```powershell
+.\index-oxide-mcp.exe manage
 ```
 
-### 5. Quick Start Summary
-
-For most local users:
-
-1. Run `docker-compose up -d`
-2. Run `cargo build --release`
-3. Add the `stdio` config to your MCP client
-4. Set `GEMINI_API_KEY` in the client config
-5. Restart your MCP client
+In the TUI, enter a repository path and press `Enter` to start indexing it. Press `q` to quit.
 
 ## Testing and Debugging with MCP Inspector
 
@@ -229,27 +144,12 @@ Below are the minimum configuration schemas for popular agentic clients. Replace
 
 Use one of two integration styles:
 
-- `stdio`: the client starts the Index Oxide MCP binary and must receive `GEMINI_API_KEY` in its local server environment.
-- `streamable-http` service mode: start Index Oxide MCP yourself with `--transport streamable-http`, then point the client at `http://localhost:8754/mcp`.
+- `stdio`: the client starts the Index Oxide MCP binary with the `serve` argument and must receive `GEMINI_API_KEY` in its local server environment.
+- `streamable-http` service mode: start Index Oxide MCP yourself with `serve --transport streamable-http`, then point the client at `http://localhost:8754/mcp`.
 
 The HTTP service mode exposes RMCP Streamable HTTP at `/mcp`. If a client offers multiple HTTP-like transport choices, choose `http`, `remote`, or `Streamable HTTP` for `http://localhost:8754/mcp`.
 
 ### Gemini CLI
-
-Stdio config for `~/.gemini/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "index-oxide": {
-      "command": "/absolute/path/to/index-oxide-mcp",
-      "env": {
-        "GEMINI_API_KEY": "your_gemini_api_key_here"
-      }
-    }
-  }
-}
-```
 
 Streamable HTTP service config for `~/.gemini/settings.json`:
 
