@@ -10,6 +10,10 @@ use clap::{Parser, Subcommand};
 #[derive(Parser, Debug)]
 #[command(name = "inxe-index-mcp", version, about)]
 pub struct CliArgs {
+    /// API Key for Gemini authentication. If provided, overrides the environment variable.
+    #[arg(long, env = "GEMINI_API_KEY", global = true)]
+    pub api_key: Option<String>,
+
     #[command(subcommand)]
     pub command: Commands,
 }

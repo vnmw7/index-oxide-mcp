@@ -79,6 +79,15 @@ async fn main() -> anyhow::Result<()> {
 
     info!("inxe-index-mcp starting");
 
+    let args = cli::CliArgs::parse();
+
+    // If API key is provided via CLI, set it in the environment
+    if let Some(key) = args.api_key {
+        unsafe {
+            std::env::set_var("GEMINI_API_KEY", key);
+        }
+    }
+
     // Load configuration from environment
     let config = InxeConfig::from_env()?;
     info!(
@@ -108,8 +117,6 @@ async fn main() -> anyhow::Result<()> {
     let gemini_arc = gemini;
     let qdrant_arc = qdrant;
     let jobs_arc = jobs;
-
-    let args = cli::CliArgs::parse();
 
     match args.command {
         cli::Commands::Serve { transport } => match transport {
