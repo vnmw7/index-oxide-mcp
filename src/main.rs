@@ -36,6 +36,9 @@ use tracing_subscriber::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load .env file if it exists
+    dotenvy::dotenv().ok();
+
     // Initialize tracing
     // Files are saved in the same directory as the executable
     let log_dir = std::env::current_exe()?
