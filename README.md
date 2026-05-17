@@ -65,7 +65,27 @@ Qdrant ports used by this project:
 Production note: Qdrant's official documentation recommends managed Qdrant Cloud, Kubernetes, or a carefully operated Docker/Compose deployment for production. If you self-host with Docker/Compose, use persistent SSD/NVMe-backed storage, restrict network access, configure security settings, and plan backup/restore, monitoring, and upgrades.
 
 ### 3. Configure Environment Variables
-???
+
+Index Oxide MCP requires a `GEMINI_API_KEY` to function. You have three ways to provide it (in order of precedence):
+
+1.  **CLI Argument**: Pass it directly when running the binary.
+    ```powershell
+    .\index-oxide-mcp.exe --api-key "your_api_key_here" serve
+    ```
+2.  **Environment Variable**: Set it in your shell environment.
+    ```powershell
+    $env:GEMINI_API_KEY="your_api_key_here"
+    ```
+3.  **.env File**: Create a file named `.env` in the root directory (where you run the binary).
+    ```env
+    GEMINI_API_KEY=your_api_key_here
+    QDRANT_URL=http://localhost:6334
+    ```
+
+Other optional environment variables:
+- `QDRANT_URL`: URL of the Qdrant gRPC endpoint (default: `http://localhost:6334`).
+- `INXE_EMBEDDING_MODEL`: The Gemini embedding model to use (default: `gemini-embedding-2`).
+- `INXE_SERVER_PORT`: Port for Streamable HTTP transport (default: `8754`).
 
 ### 4. Choose a Transport Mode
 
@@ -114,14 +134,14 @@ Default Streamable HTTP endpoints:
 
 *Configuration details for Streamable HTTP clients can be found in the **Supported MCP Clients** section below.*
 
-#### Mode C: `manage` Interactive TUI
+### Open CLI: `manage` Interactive TUI
 
 Use `manage` when you want a terminal UI for index operations instead of connecting through an MCP client. The TUI uses the same `GEMINI_API_KEY`, `QDRANT_URL`, and embedding configuration as the MCP server.
 
 Windows PowerShell:
 
 ```powershell
-.\index-oxide-mcp.exe manage
+.\index-oxide-mcp.exe --api-key "your_api_key_here" manage 
 ```
 
 In the TUI, enter a repository path and press `Enter` to start indexing it. Press `q` to quit.
