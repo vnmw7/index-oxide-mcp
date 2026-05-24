@@ -27,6 +27,8 @@ impl InxeQdrantClient {
     /// Connect to Qdrant via gRPC.
     pub fn new(config: &QdrantConfig, dimensions: u32) -> Result<Self, StorageError> {
         let client = Qdrant::from_url(&config.url)
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| StorageError::QdrantOperation(e.to_string()))?;
 
@@ -61,7 +63,8 @@ impl InxeQdrantClient {
                             .on_disk(true),
                     )
                     .hnsw_config(HnswConfigDiffBuilder::default().on_disk(true))
-                    .on_disk_payload(true),
+                    .on_disk_payload(true)
+                    .timeout(120),
             )
             .await
             .map_err(|e| StorageError::CollectionCreation(e.to_string()))?;
