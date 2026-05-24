@@ -14,7 +14,10 @@ use crate::models::job::IndexJob;
 use crate::util::hashing::sanitize_repo_name;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{
+        self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
+        Event, KeyCode, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -37,7 +40,7 @@ pub async fn run_tui(
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture, EnableBracketedPaste)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -52,7 +55,8 @@ pub async fn run_tui(
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        DisableMouseCapture
+        DisableMouseCapture,
+        DisableBracketedPaste
     )?;
     terminal.show_cursor()?;
 
@@ -87,7 +91,7 @@ impl App {
             qdrant,
             jobs,
             input: String::new(),
-            messages: vec!["Welcome to Inxe Index Manager. Press 'q' to quit.".to_string()],
+            messages: vec!["Welcome to Index Oxide MCP Manager. Press Ctrl+Q to quit.".to_string()],
             collections: Vec::new(),
             last_tick: std::time::Instant::now(),
         }
@@ -143,25 +147,37 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> anyho
         terminal.draw(|f| ui(f, app))?;
 
         if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == event::KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Enter => {
-                            app.start_indexing().await;
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind == event::KeyEventKind::Press {
+                        if key.modifiers.contains(KeyModifiers::CONTROL) {
+                            match key.code {
+                                KeyCode::Char('q') => return Ok(()),
+                                _ => {}
+                            }
+                        } else {
+                            match key.code {
+                                KeyCode::Enter => {
+                                    app.start_indexing().await;
+                                }
+                                KeyCode::Char(c) => {
+                                    app.input.push(c);
+                                }
+                                KeyCode::Backspace => {
+                                    app.input.pop();
+                                }
+                                KeyCode::Esc => {
+                                    app.input.clear();
+                                }
+                                _ => {}
+                            }
                         }
-                        KeyCode::Char(c) => {
-                            app.input.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            app.input.pop();
-                        }
-                        KeyCode::Esc => {
-                            app.input.clear();
-                        }
-                        _ => {}
                     }
                 }
+                Event::Paste(text) => {
+                    app.input.push_str(&text);
+                }
+                _ => {}
             }
         }
 
