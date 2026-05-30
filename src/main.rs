@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 /*
- * System: Inxe Index MCP
+ * System: Index Oxide MCP
  * File URL: inxe-index-mcp/src/main.rs
  * Purpose: Entry point - initializes tracing, loads config, and routes to MCP server or TUI manager
  */

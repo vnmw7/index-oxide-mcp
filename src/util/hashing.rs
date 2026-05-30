@@ -1,5 +1,5 @@
 /*
- * System: Inxe Index MCP
+ * System: Index Oxide MCP
  * File URL: inxe-index-mcp/src/util/hashing.rs
  * Purpose: Content hashing (BLAKE3) and deterministic UUID v5 generation for chunk IDs
  */

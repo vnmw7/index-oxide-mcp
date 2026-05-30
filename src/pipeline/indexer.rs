@@ -1,5 +1,5 @@
 /*
- * System: Inxe Index MCP
+ * System: Index Oxide MCP
  * File URL: inxe-index-mcp/src/pipeline/indexer.rs
  * Purpose: Stage D - Batch upsert embedded chunks into Qdrant with retry and backpressure
  */

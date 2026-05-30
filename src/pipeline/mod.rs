@@ -1,5 +1,5 @@
 /*
- * System: Inxe Index MCP
+ * System: Index Oxide MCP
  * File URL: inxe-index-mcp/src/pipeline/mod.rs
  * Purpose: Pipeline orchestrator that wires discovery → parse → embed → index stages with bounded channels
  */

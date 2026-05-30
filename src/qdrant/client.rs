@@ -1,5 +1,5 @@
 /*
- * System: Inxe Index MCP
+ * System: Index Oxide MCP
  * File URL: inxe-index-mcp/src/qdrant/client.rs
  * Purpose: Qdrant vector DB client wrapper for collection management, upsert, query, and delete
  */

@@ -1,5 +1,5 @@
 /*
- * System: Inxe Index MCP
+ * System: Index Oxide MCP
  * File URL: inxe-index-mcp/src/cli.rs
  * Purpose: CLI argument definitions for subcommand selection and configuration
  */

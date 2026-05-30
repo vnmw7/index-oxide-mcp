@@ -1,5 +1,5 @@
 /*
- * System: Inxe Index MCP
+ * System: Index Oxide MCP
  * Module: Configuration
  * File URL: inxe-index-mcp/src/config.rs
  * Purpose: Configuration loaded from environment variables, designed for MCP client env setup
