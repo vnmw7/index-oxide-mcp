@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/cli.rs
+ * File URL: index-oxide-mcp/src/cli.rs
  * Purpose: CLI argument definitions for subcommand selection and configuration
  */
 
@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 
 /// Inxe Index MCP: High-throughput codebase indexer for agentic AI workflows.
 #[derive(Parser, Debug)]
-#[command(name = "inxe-index-mcp", version, about)]
+#[command(name = "index-oxide-mcp", version, about)]
 pub struct CliArgs {
     /// API Key for Gemini authentication. If provided, overrides the environment variable.
     #[arg(long, env = "GEMINI_API_KEY", global = true)]

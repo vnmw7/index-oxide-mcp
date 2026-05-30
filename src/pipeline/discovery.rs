@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/pipeline/discovery.rs
+ * File URL: index-oxide-mcp/src/pipeline/discovery.rs
  * Purpose: Stage A - .gitignore-aware file discovery using the ignore crate
  */
 

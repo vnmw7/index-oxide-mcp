@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/main.rs
+ * File URL: index-oxide-mcp/src/main.rs
  * Purpose: Entry point - initializes tracing, loads config, and routes to MCP server or TUI manager
  */
 
@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
 
     let file_appender = RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
-        .filename_prefix("inxe-index-mcp")
+        .filename_prefix("index-oxide-mcp")
         .filename_suffix("log")
         .build(log_dir)
         .expect("Failed to initialize rolling file appender");
@@ -77,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
         .with(file_layer)
         .init();
 
-    info!("inxe-index-mcp starting");
+    info!("index-oxide-mcp starting");
 
     let args = cli::CliArgs::parse();
 
@@ -180,6 +180,6 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    info!("inxe-index-mcp shutting down");
+    info!("index-oxide-mcp shutting down");
     Ok(())
 }

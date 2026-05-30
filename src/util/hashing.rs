@@ -1,12 +1,12 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/util/hashing.rs
+ * File URL: index-oxide-mcp/src/util/hashing.rs
  * Purpose: Content hashing (BLAKE3) and deterministic UUID v5 generation for chunk IDs
  */
 
 use uuid::Uuid;
 
-/// Namespace UUID for inxe-index-mcp chunk IDs.
+/// Namespace UUID for index-oxide-mcp chunk IDs.
 const INXE_NAMESPACE: Uuid = Uuid::from_bytes([
     0x69, 0x6e, 0x78, 0x65, // "inxe"
     0x2d, 0x69, 0x6e, 0x64, // "-ind"

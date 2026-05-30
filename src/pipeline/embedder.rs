@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/pipeline/embedder.rs
+ * File URL: index-oxide-mcp/src/pipeline/embedder.rs
  * Purpose: Stage C - Adaptive batch embedding via Gemini API with concurrency control and caching
  */
 

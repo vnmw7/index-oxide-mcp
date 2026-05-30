@@ -1,13 +1,13 @@
 /*
  * System: Index Oxide MCP
  * Module: Configuration
- * File URL: inxe-index-mcp/src/config.rs
+ * File URL: index-oxide-mcp/src/config.rs
  * Purpose: Configuration loaded from environment variables, designed for MCP client env setup
  */
 
 use std::env;
 
-/// Root configuration for the inxe-index-mcp server.
+/// Root configuration for the index-oxide-mcp server.
 #[derive(Debug, Clone)]
 pub struct InxeConfig {
     pub server: ServerConfig,

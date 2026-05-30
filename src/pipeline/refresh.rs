@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/pipeline/refresh.rs
+ * File URL: index-oxide-mcp/src/pipeline/refresh.rs
  * Purpose: Incremental refresh - detect changed/deleted files and selectively re-index
  */
 

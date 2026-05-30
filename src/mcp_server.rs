@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/mcp_server.rs
+ * File URL: index-oxide-mcp/src/mcp_server.rs
  * Purpose: MCP server for searching in indexed codebases (Dual-mode Streamable HTTP/Stdio)
  */
 

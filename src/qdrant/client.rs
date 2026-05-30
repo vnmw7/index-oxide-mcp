@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/qdrant/client.rs
+ * File URL: index-oxide-mcp/src/qdrant/client.rs
  * Purpose: Qdrant vector DB client wrapper for collection management, upsert, query, and delete
  */
 
@@ -17,7 +17,7 @@ use qdrant_client::Qdrant;
 use serde_json::json;
 use tracing::{debug, info, warn};
 
-/// Wrapper around the Qdrant gRPC client for inxe-index-mcp operations.
+/// Wrapper around the Qdrant gRPC client for index-oxide-mcp operations.
 pub struct InxeQdrantClient {
     client: Qdrant,
     dimensions: u32,

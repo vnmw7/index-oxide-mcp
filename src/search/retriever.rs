@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: inxe-index-mcp/src/search/retriever.rs
+ * File URL: index-oxide-mcp/src/search/retriever.rs
  * Purpose: Hybrid code retrieval with vector search, filtering, and deterministic reranking
  */
 

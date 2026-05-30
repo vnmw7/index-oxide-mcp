@@ -1,7 +1,7 @@
 /*
  * System: Index Oxide MCP
  * Module: Management TUI
- * File URL: inxe-index-mcp/src/manage.rs
+ * File URL: index-oxide-mcp/src/manage.rs
  * Purpose: Interactive Terminal User Interface for managing codebase indexes
  */
 
