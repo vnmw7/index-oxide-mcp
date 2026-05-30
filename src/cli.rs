@@ -6,7 +6,7 @@
 
 use clap::{Parser, Subcommand};
 
-/// Inxe Index MCP: High-throughput codebase indexer for agentic AI workflows.
+/// Index Oxide MCP: High-throughput codebase indexer for agentic AI workflows.
 #[derive(Parser, Debug)]
 #[command(name = "index-oxide-mcp", version, about)]
 pub struct CliArgs {
