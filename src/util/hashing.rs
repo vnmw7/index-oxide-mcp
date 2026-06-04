@@ -1,17 +1,17 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/util/hashing.rs
+ * File URL: index-oxide-mcp/src/util/hashing.rs
  * Purpose: Content hashing (BLAKE3) and deterministic UUID v5 generation for chunk IDs
  */
 
 use uuid::Uuid;
 
-/// Namespace UUID for oxidized-index-mcp chunk IDs.
-const OXI_NAMESPACE: Uuid = Uuid::from_bytes([
-    0x6f, 0x78, 0x69, 0x64, // "oxid"
-    0x69, 0x7a, 0x65, 0x64, // "ized"
+/// Namespace UUID for index-oxide-mcp chunk IDs.
+const INXE_NAMESPACE: Uuid = Uuid::from_bytes([
+    0x69, 0x6e, 0x78, 0x65, // "inxe"
     0x2d, 0x69, 0x6e, 0x64, // "-ind"
     0x65, 0x78, 0x6d, 0x63, // "exmc"
+    0x70, 0x70, 0x70, 0x70, // padding
 ]);
 
 /// Compute BLAKE3 hash of content, returned as a hex string.
@@ -34,7 +34,7 @@ pub fn generate_chunk_id(
         "{}:{}:{}:{}:{}:{}",
         repo, path, symbol_path, byte_start, byte_end, content_hash
     );
-    Uuid::new_v5(&OXI_NAMESPACE, input.as_bytes()).to_string()
+    Uuid::new_v5(&INXE_NAMESPACE, input.as_bytes()).to_string()
 }
 
 /// Sanitize a repository path into a valid collection name component.
@@ -60,7 +60,7 @@ pub fn sanitize_repo_name(repo_path: &str) -> String {
 
 /// Build the per-repo Qdrant collection name.
 pub fn build_collection_name(repo_name: &str) -> String {
-    format!("oxi_{}", repo_name)
+    format!("inxe_{}", repo_name)
 }
 
 #[cfg(test)]
@@ -98,6 +98,6 @@ mod tests {
 
     #[test]
     fn test_collection_name() {
-        assert_eq!(build_collection_name("my_project"), "oxi_my_project");
+        assert_eq!(build_collection_name("my_project"), "inxe_my_project");
     }
 }

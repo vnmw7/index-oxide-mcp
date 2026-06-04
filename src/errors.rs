@@ -1,14 +1,14 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/errors.rs
+ * File URL: index-oxide-mcp/src/errors.rs
  * Purpose: Domain error types for pipeline, embedding, storage, and parsing failures
  */
 
 use thiserror::Error;
 
-/// Top-level domain errors for the oxidized-index-mcp system.
+/// Top-level domain errors for the index-oxide-mcp system.
 #[derive(Error, Debug)]
-pub enum OxiError {
+pub enum InxeError {
     #[error("Pipeline error: {0}")]
     Pipeline(#[from] PipelineError),
 

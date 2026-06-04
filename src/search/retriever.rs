@@ -1,12 +1,12 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/search/retriever.rs
+ * File URL: index-oxide-mcp/src/search/retriever.rs
  * Purpose: Hybrid code retrieval with vector search, filtering, and deterministic reranking
  */
 
 use crate::gemini::client::GeminiClient;
 use crate::models::search::{SearchRequest, SearchResponse, SearchResult};
-use crate::qdrant::client::OxiQdrantClient;
+use crate::qdrant::client::InxeQdrantClient;
 use crate::util::hashing::build_collection_name;
 use std::sync::Arc;
 use tracing::info;
@@ -15,7 +15,7 @@ use tracing::info;
 pub async fn search_codebase(
     request: &SearchRequest,
     gemini: &Arc<GeminiClient>,
-    qdrant: &Arc<OxiQdrantClient>,
+    qdrant: &Arc<InxeQdrantClient>,
 ) -> anyhow::Result<SearchResponse> {
     let repo = request.repo.as_deref().unwrap_or("unknown");
     let collection_name = build_collection_name(repo);
@@ -25,7 +25,7 @@ pub async fn search_codebase(
     let query_embedding = gemini.embed_query(&request.query).await?;
 
     // Step 2: Build filters
-    let filter = OxiQdrantClient::build_filter(
+    let filter = InxeQdrantClient::build_filter(
         &request.language,
         &request.path_prefix,
         &request.symbol_kind,
@@ -35,7 +35,7 @@ pub async fn search_codebase(
     // Step 3: Vector search in Qdrant
     // Fetch more candidates than needed for reranking
     let fetch_limit = (limit * 3).min(100);
-    let scored_points = qdrant
+    let scored_points: Vec<qdrant_client::qdrant::ScoredPoint> = qdrant
         .query_chunks(&collection_name, query_embedding, fetch_limit, filter)
         .await?;
 

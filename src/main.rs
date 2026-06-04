@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/main.rs
- * Purpose: Entry point - initializes tracing, loads config, starts MCP server on stdio transport
+ * File URL: index-oxide-mcp/src/main.rs
+ * Purpose: Entry point - initializes tracing, loads config, and routes to MCP server or TUI manager
  */
 
 mod cli;
@@ -10,6 +10,7 @@ mod config;
 mod errors;
 mod gemini;
 mod jobs;
+mod manage;
 mod mcp_server;
 mod models;
 mod pipeline;
@@ -17,11 +18,11 @@ mod qdrant;
 mod search;
 mod util;
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::gemini::client::GeminiClient;
 use crate::jobs::registry::JobRegistry;
-use crate::mcp_server::OxiServer;
-use crate::qdrant::client::OxiQdrantClient;
+use crate::mcp_server::InxeServer;
+use crate::qdrant::client::InxeQdrantClient;
 use axum::Router;
 use clap::Parser;
 use rmcp::transport::streamable_http_server::{
@@ -35,6 +36,9 @@ use tracing_subscriber::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load .env file if it exists
+    dotenvy::dotenv().ok();
+
     // Initialize tracing
     // Files are saved in the same directory as the executable
     let log_dir = std::env::current_exe()?
@@ -73,10 +77,19 @@ async fn main() -> anyhow::Result<()> {
         .with(file_layer)
         .init();
 
-    info!("oxidized-index-mcp starting");
+    info!("index-oxide-mcp starting");
+
+    let args = cli::CliArgs::parse();
+
+    // If API key is provided via CLI, set it in the environment
+    if let Some(key) = args.api_key {
+        unsafe {
+            std::env::set_var("GEMINI_API_KEY", key);
+        }
+    }
 
     // Load configuration from environment
-    let config = OxiConfig::from_env()?;
+    let config = InxeConfig::from_env()?;
     info!(
         model = %config.gemini.model,
         dimensions = config.embedding.dimensions,
@@ -91,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
     ));
 
     // Initialize Qdrant client
-    let qdrant = Arc::new(OxiQdrantClient::new(
+    let qdrant = Arc::new(InxeQdrantClient::new(
         &config.qdrant,
         config.embedding.dimensions,
     )?);
@@ -105,64 +118,68 @@ async fn main() -> anyhow::Result<()> {
     let qdrant_arc = qdrant;
     let jobs_arc = jobs;
 
-    let args = cli::CliArgs::parse();
+    match args.command {
+        cli::Commands::Serve { transport } => match transport {
+            cli::TransportMode::Stdio => {
+                // Create MCP server
+                let server = InxeServer::new(
+                    Arc::clone(&config_arc),
+                    Arc::clone(&gemini_arc),
+                    Arc::clone(&qdrant_arc),
+                    Arc::clone(&jobs_arc),
+                );
 
-    match args.transport {
-        cli::TransportMode::Stdio => {
-            // Create MCP server
-            let server = OxiServer::new(
-                Arc::clone(&config_arc),
-                Arc::clone(&gemini_arc),
-                Arc::clone(&qdrant_arc),
-                Arc::clone(&jobs_arc),
-            );
+                info!("Starting MCP server on stdio transport");
 
-            info!("Starting MCP server on stdio transport");
+                // Start MCP server on stdio
+                let transport = (tokio::io::stdin(), tokio::io::stdout());
+                let running_server = server
+                    .serve(transport)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to start MCP server: {}", e))?;
 
-            // Start MCP server on stdio
-            let transport = (tokio::io::stdin(), tokio::io::stdout());
-            let running_server = server
-                .serve(transport)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to start MCP server: {}", e))?;
+                // Wait for the server to finish (runs until the transport closes)
+                running_server
+                    .waiting()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("MCP server error: {}", e))?;
+            }
+            cli::TransportMode::StreamableHttp => {
+                let mcp_service = StreamableHttpService::new(
+                    {
+                        let config_arc = Arc::clone(&config_arc);
+                        let gemini = Arc::clone(&gemini_arc);
+                        let qdrant = Arc::clone(&qdrant_arc);
+                        let jobs = Arc::clone(&jobs_arc);
+                        move || {
+                            Ok(InxeServer::new(
+                                Arc::clone(&config_arc),
+                                Arc::clone(&gemini),
+                                Arc::clone(&qdrant),
+                                Arc::clone(&jobs),
+                            ))
+                        }
+                    },
+                    LocalSessionManager::default().into(),
+                    Default::default(),
+                );
 
-            // Wait for the server to finish (runs until the transport closes)
-            running_server
-                .waiting()
-                .await
-                .map_err(|e| anyhow::anyhow!("MCP server error: {}", e))?;
-        }
-        cli::TransportMode::StreamableHttp => {
-            let mcp_service = StreamableHttpService::new(
-                {
-                    let config_arc = Arc::clone(&config_arc);
-                    let gemini = Arc::clone(&gemini_arc);
-                    let qdrant = Arc::clone(&qdrant_arc);
-                    let jobs = Arc::clone(&jobs_arc);
-                    move || {
-                        Ok(OxiServer::new(
-                            Arc::clone(&config_arc),
-                            Arc::clone(&gemini),
-                            Arc::clone(&qdrant),
-                            Arc::clone(&jobs),
-                        ))
-                    }
-                },
-                LocalSessionManager::default().into(),
-                Default::default(),
-            );
+                let app = Router::new()
+                    .nest_service("/mcp", mcp_service)
+                    .route("/health", axum::routing::get(|| async { "ok" }));
 
-            let app = Router::new()
-                .nest_service("/mcp", mcp_service)
-                .route("/health", axum::routing::get(|| async { "ok" }));
-
-            let addr = format!("{}:{}", config_arc.server.host, config_arc.server.port);
-            let listener = tokio::net::TcpListener::bind(&addr).await?;
-            info!(address = %addr, "MCP Streamable HTTP server listening");
-            axum::serve(listener, app).await?;
+                let addr = format!("{}:{}", config_arc.server.host, config_arc.server.port);
+                let listener = tokio::net::TcpListener::bind(&addr).await?;
+                info!(address = %addr, "MCP Streamable HTTP server listening");
+                axum::serve(listener, app).await?;
+            }
+        },
+        cli::Commands::Manage => {
+            info!("Starting TUI manager");
+            manage::run_tui(config_arc, gemini_arc, qdrant_arc, jobs_arc).await?;
         }
     }
 
-    info!("oxidized-index-mcp shutting down");
+    info!("index-oxide-mcp shutting down");
     Ok(())
 }

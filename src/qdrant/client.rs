@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/qdrant/client.rs
+ * File URL: index-oxide-mcp/src/qdrant/client.rs
  * Purpose: Qdrant vector DB client wrapper for collection management, upsert, query, and delete
  */
 
@@ -17,16 +17,18 @@ use qdrant_client::Qdrant;
 use serde_json::json;
 use tracing::{debug, info, warn};
 
-/// Wrapper around the Qdrant gRPC client for oxidized-index-mcp operations.
-pub struct OxiQdrantClient {
+/// Wrapper around the Qdrant gRPC client for index-oxide-mcp operations.
+pub struct InxeQdrantClient {
     client: Qdrant,
     dimensions: u32,
 }
 
-impl OxiQdrantClient {
+impl InxeQdrantClient {
     /// Connect to Qdrant via gRPC.
     pub fn new(config: &QdrantConfig, dimensions: u32) -> Result<Self, StorageError> {
         let client = Qdrant::from_url(&config.url)
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| StorageError::QdrantOperation(e.to_string()))?;
 
@@ -61,7 +63,8 @@ impl OxiQdrantClient {
                             .on_disk(true),
                     )
                     .hnsw_config(HnswConfigDiffBuilder::default().on_disk(true))
-                    .on_disk_payload(true),
+                    .on_disk_payload(true)
+                    .timeout(120),
             )
             .await
             .map_err(|e| StorageError::CollectionCreation(e.to_string()))?;
@@ -257,8 +260,8 @@ impl OxiQdrantClient {
         Ok(())
     }
 
-    /// List all collections matching the oxi_ prefix.
-    pub async fn list_oxi_collections(&self) -> Result<Vec<String>, StorageError> {
+    /// List all collections matching the inxe_ prefix.
+    pub async fn list_inxe_collections(&self) -> Result<Vec<String>, StorageError> {
         let collections = self
             .client
             .list_collections()
@@ -268,7 +271,7 @@ impl OxiQdrantClient {
         Ok(collections
             .collections
             .into_iter()
-            .filter(|c| c.name.starts_with("oxi_"))
+            .filter(|c| c.name.starts_with("inxe_"))
             .map(|c| c.name)
             .collect())
     }

@@ -1,14 +1,14 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/mcp_server.rs
+ * File URL: index-oxide-mcp/src/mcp_server.rs
  * Purpose: MCP server for searching in indexed codebases (Dual-mode Streamable HTTP/Stdio)
  */
 
-use crate::config::OxiConfig;
+use crate::config::InxeConfig;
 use crate::gemini::client::GeminiClient;
 use crate::jobs::registry::JobRegistry;
 use crate::models::search::SearchRequest;
-use crate::qdrant::client::OxiQdrantClient;
+use crate::qdrant::client::InxeQdrantClient;
 use crate::search::retriever;
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
@@ -19,19 +19,19 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 /// Shared state for the MCP server, held across all tool invocations.
-pub struct OxiServer {
-    pub config: Arc<OxiConfig>,
+pub struct InxeServer {
+    pub config: Arc<InxeConfig>,
     pub gemini: Arc<GeminiClient>,
-    pub qdrant: Arc<OxiQdrantClient>,
+    pub qdrant: Arc<InxeQdrantClient>,
     pub jobs: Arc<JobRegistry>,
     tool_router: ToolRouter<Self>,
 }
 
-impl OxiServer {
+impl InxeServer {
     pub fn new(
-        config: Arc<OxiConfig>,
+        config: Arc<InxeConfig>,
         gemini: Arc<GeminiClient>,
-        qdrant: Arc<OxiQdrantClient>,
+        qdrant: Arc<InxeQdrantClient>,
         jobs: Arc<JobRegistry>,
     ) -> Self {
         Self {
@@ -45,7 +45,7 @@ impl OxiServer {
 }
 
 #[tool_handler(router = self.tool_router)]
-impl ServerHandler for OxiServer {
+impl ServerHandler for InxeServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
             "Search indexed codebases using semantic similarity with optional filters.",
@@ -54,7 +54,7 @@ impl ServerHandler for OxiServer {
 }
 
 #[tool_router(router = tool_router)]
-impl OxiServer {
+impl InxeServer {
     /// Search indexed codebases using semantic similarity with optional filters.
     #[tool(
         description = "Search indexed codebases using semantic similarity. Supports filtering by language, path prefix, symbol kind, and repository. Returns ranked code snippets with full provenance metadata."
