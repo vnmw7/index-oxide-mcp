@@ -4,25 +4,30 @@
  * Purpose: Hybrid code retrieval with vector search, filtering, and deterministic reranking
  */
 
-use crate::gemini::client::GeminiClient;
+use crate::clients::embedder::EmbedderClient;
+use crate::config::InxeConfig;
 use crate::models::search::{SearchRequest, SearchResponse, SearchResult};
 use crate::qdrant::client::InxeQdrantClient;
 use crate::util::hashing::build_collection_name;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::info;
 
 /// Execute a hybrid search across indexed code chunks.
 pub async fn search_codebase(
     request: &SearchRequest,
-    gemini: &Arc<GeminiClient>,
+    embedder: &Arc<RwLock<EmbedderClient>>,
     qdrant: &Arc<InxeQdrantClient>,
+    config: &Arc<InxeConfig>,
 ) -> anyhow::Result<SearchResponse> {
     let repo = request.repo.as_deref().unwrap_or("unknown");
     let collection_name = build_collection_name(repo);
     let limit = request.limit.unwrap_or(10);
 
     // Step 1: Embed the query
-    let query_embedding = gemini.embed_query(&request.query).await?;
+    let client = embedder.read().await;
+    let query_embedding = client.embed_query(&request.query).await?;
+    drop(client);
 
     // Step 2: Build filters
     let filter = InxeQdrantClient::build_filter(
@@ -136,7 +141,7 @@ pub async fn search_codebase(
     Ok(SearchResponse {
         results,
         total_candidates,
-        query_embedding_model: "gemini-embedding-2".to_string(),
+        query_embedding_model: config.active_model_name().to_string(),
     })
 }
 
