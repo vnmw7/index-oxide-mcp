@@ -11,10 +11,18 @@ use std::env;
 #[derive(Debug, Clone)]
 pub struct InxeConfig {
     pub server: ServerConfig,
+    pub active_embedder: ActiveEmbedder,
     pub gemini: GeminiConfig,
+    pub ollama: OllamaConfig,
     pub qdrant: QdrantConfig,
     pub pipeline: PipelineConfig,
     pub embedding: EmbeddingConfig,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActiveEmbedder {
+    Gemini,
+    Ollama,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +43,12 @@ pub struct GeminiConfig {
 #[derive(Debug, Clone)]
 pub struct QdrantConfig {
     pub url: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct OllamaConfig {
+    pub base_url: String,
+    pub model: String,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +80,11 @@ impl InxeConfig {
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| anyhow::anyhow!("GEMINI_API_KEY environment variable is required"))?;
 
+        let active_embedder = match env::var("ACTIVE_EMBEDDER").unwrap_or_else(|_| "gemini".to_string()).to_lowercase().as_str() {
+            "ollama" => ActiveEmbedder::Ollama,
+            _ => ActiveEmbedder::Gemini,
+        };
+
         Ok(Self {
             server: ServerConfig {
                 host: env::var("INXE_SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
@@ -76,6 +95,7 @@ impl InxeConfig {
                 host_workspace_path: env::var("INXE_HOST_WORKSPACE_PATH").ok(),
                 container_workspace_path: env::var("INXE_CONTAINER_WORKSPACE_PATH").ok(),
             },
+            active_embedder,
             gemini: GeminiConfig {
                 api_key,
                 model: env::var("INXE_EMBEDDING_MODEL")
@@ -83,6 +103,10 @@ impl InxeConfig {
                 base_url: env::var("INXE_GEMINI_BASE_URL").unwrap_or_else(|_| {
                     "https://generativelanguage.googleapis.com/v1beta".to_string()
                 }),
+            },
+            ollama: OllamaConfig {
+                base_url: env::var("OLLAMA_BASE_URL").unwrap_or_else(|_| "http://localhost:11434".to_string()),
+                model: env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen3-embedding:4b-fp16".to_string()),
             },
             qdrant: QdrantConfig {
                 url: env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6334".to_string()),
@@ -109,6 +133,14 @@ impl InxeConfig {
                 rate_limit_rpm: parse_env_or("INXE_RATE_LIMIT_RPM", 15),
             },
         })
+    }
+
+    /// Returns the active embedding model name based on the configured provider.
+    pub fn active_model_name(&self) -> &str {
+        match self.active_embedder {
+            ActiveEmbedder::Gemini => &self.gemini.model,
+            ActiveEmbedder::Ollama => &self.ollama.model,
+        }
     }
 }
 
