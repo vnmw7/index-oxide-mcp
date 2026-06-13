@@ -6,11 +6,11 @@
  */
 
 use crate::config::InxeConfig;
-use crate::gemini::client::GeminiClient;
+use crate::clients::embedder::EmbedderClient;
 use crate::jobs::registry::JobRegistry;
-use crate::qdrant::client::InxeQdrantClient;
 use crate::pipeline::{run_pipeline, PipelineOptions};
 use crate::models::job::IndexJob;
+use crate::qdrant::client::InxeQdrantClient;
 use crate::util::hashing::sanitize_repo_name;
 
 use crossterm::{
@@ -29,11 +29,12 @@ use ratatui::{
     Frame, Terminal,
 };
 use std::{io, sync::Arc, time::Duration};
+use tokio::sync::RwLock;
 use tracing::error;
 
 pub async fn run_tui(
     config: Arc<InxeConfig>,
-    gemini: Arc<GeminiClient>,
+    embedder: Arc<RwLock<EmbedderClient>>,
     qdrant: Arc<InxeQdrantClient>,
     jobs: Arc<JobRegistry>,
 ) -> anyhow::Result<()> {
@@ -45,7 +46,7 @@ pub async fn run_tui(
     let mut terminal = Terminal::new(backend)?;
 
     // Create app state
-    let mut app = App::new(config, gemini, qdrant, jobs);
+    let mut app = App::new(config, embedder, qdrant, jobs);
 
     // Run the TUI loop
     let res = run_app(&mut terminal, &mut app).await;
@@ -69,7 +70,7 @@ pub async fn run_tui(
 
 struct App {
     config: Arc<InxeConfig>,
-    gemini: Arc<GeminiClient>,
+    embedder: Arc<RwLock<EmbedderClient>>,
     qdrant: Arc<InxeQdrantClient>,
     jobs: Arc<JobRegistry>,
     input: String,
@@ -81,13 +82,13 @@ struct App {
 impl App {
     fn new(
         config: Arc<InxeConfig>,
-        gemini: Arc<GeminiClient>,
+        embedder: Arc<RwLock<EmbedderClient>>,
         qdrant: Arc<InxeQdrantClient>,
         jobs: Arc<JobRegistry>,
     ) -> App {
         App {
             config,
-            gemini,
+            embedder,
             qdrant,
             jobs,
             input: String::new(),
@@ -128,12 +129,12 @@ impl App {
         self.input.clear();
 
         let config = Arc::clone(&self.config);
-        let gemini = Arc::clone(&self.gemini);
+        let embedder = Arc::clone(&self.embedder);
         let qdrant = Arc::clone(&self.qdrant);
         let pipeline_job = Arc::clone(&job);
-        
+
         tokio::spawn(async move {
-            if let Err(e) = run_pipeline(config, gemini, qdrant, pipeline_job, PipelineOptions::default()).await {
+            if let Err(e) = run_pipeline(config, embedder, qdrant, pipeline_job, PipelineOptions::default()).await {
                 error!(error = %e, "Pipeline failed");
             }
         });
