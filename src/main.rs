@@ -6,6 +6,7 @@
  */
 
 mod cli;
+mod clients;
 mod config;
 mod errors;
 mod gemini;
@@ -13,12 +14,14 @@ mod jobs;
 mod manage;
 mod mcp_server;
 mod models;
+mod ollama;
 mod pipeline;
 mod qdrant;
 mod search;
 mod util;
 
-use crate::config::InxeConfig;
+use crate::config::{ActiveEmbedder, InxeConfig};
+use crate::clients::embedder::EmbedderClient;
 use crate::gemini::client::GeminiClient;
 use crate::jobs::registry::JobRegistry;
 use crate::mcp_server::InxeServer;
@@ -30,6 +33,7 @@ use rmcp::transport::streamable_http_server::{
 };
 use rmcp::ServiceExt;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::info;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::prelude::*;
@@ -91,17 +95,22 @@ async fn main() -> anyhow::Result<()> {
     // Load configuration from environment
     let config = InxeConfig::from_env()?;
     info!(
-        model = %config.gemini.model,
+        model = %config.active_model_name(),
         dimensions = config.embedding.dimensions,
         qdrant_url = %config.qdrant.url,
         "Configuration loaded"
     );
 
-    // Initialize Gemini client
-    let gemini = Arc::new(GeminiClient::new(
-        config.gemini.clone(),
-        config.embedding.dimensions,
-    ));
+    // Initialize Embedding client
+    let embedder = Arc::new(RwLock::new(match config.active_embedder {
+        ActiveEmbedder::Gemini => EmbedderClient::Gemini(GeminiClient::new(
+            config.gemini.clone(),
+            config.embedding.dimensions,
+        )),
+        ActiveEmbedder::Ollama => EmbedderClient::Ollama(crate::ollama::client::OllamaClient::new(
+            config.ollama.clone(),
+        )),
+    }));
 
     // Initialize Qdrant client
     let qdrant = Arc::new(InxeQdrantClient::new(
@@ -114,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Wrap core components in Arc for sharing
     let config_arc = Arc::new(config);
-    let gemini_arc = gemini;
+    let embedder_arc = embedder;
     let qdrant_arc = qdrant;
     let jobs_arc = jobs;
 
@@ -124,7 +133,7 @@ async fn main() -> anyhow::Result<()> {
                 // Create MCP server
                 let server = InxeServer::new(
                     Arc::clone(&config_arc),
-                    Arc::clone(&gemini_arc),
+                    Arc::clone(&embedder_arc),
                     Arc::clone(&qdrant_arc),
                     Arc::clone(&jobs_arc),
                 );
@@ -148,13 +157,13 @@ async fn main() -> anyhow::Result<()> {
                 let mcp_service = StreamableHttpService::new(
                     {
                         let config_arc = Arc::clone(&config_arc);
-                        let gemini = Arc::clone(&gemini_arc);
+                        let embedder = Arc::clone(&embedder_arc);
                         let qdrant = Arc::clone(&qdrant_arc);
                         let jobs = Arc::clone(&jobs_arc);
                         move || {
                             Ok(InxeServer::new(
                                 Arc::clone(&config_arc),
-                                Arc::clone(&gemini),
+                                Arc::clone(&embedder),
                                 Arc::clone(&qdrant),
                                 Arc::clone(&jobs),
                             ))
@@ -176,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
         },
         cli::Commands::Manage => {
             info!("Starting TUI manager");
-            manage::run_tui(config_arc, gemini_arc, qdrant_arc, jobs_arc).await?;
+            manage::run_tui(config_arc, embedder_arc, qdrant_arc, jobs_arc).await?;
         }
     }
 
