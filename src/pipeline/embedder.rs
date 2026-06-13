@@ -5,7 +5,8 @@
  */
 
 use crate::config::InxeConfig;
-use crate::gemini::client::{EmbedInput, GeminiClient};
+use crate::clients::embedder::EmbedderClient;
+use crate::gemini::client::EmbedInput;
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::IndexJob;
 use crate::qdrant::client::InxeQdrantClient;
@@ -14,13 +15,13 @@ use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{mpsc, RwLock, Semaphore};
 use tracing::{debug, error, warn};
 
 /// Context for batch embedding tasks, shared across concurrent executions.
 struct EmbedBatchContext {
     job: Arc<IndexJob>,
-    gemini: Arc<GeminiClient>,
+    gemini: Arc<RwLock<EmbedderClient>>,
     qdrant: Arc<InxeQdrantClient>,
     collection_name: String,
     max_retries: u32,
@@ -34,7 +35,7 @@ pub async fn run_embedder(
     tx: mpsc::Sender<EmbeddedChunk>,
     job: &Arc<IndexJob>,
     config: Arc<InxeConfig>,
-    gemini: Arc<GeminiClient>,
+    gemini: Arc<RwLock<EmbedderClient>>,
     qdrant: Arc<InxeQdrantClient>,
 ) {
     let semaphore = Arc::new(Semaphore::new(config.pipeline.embed_concurrency));
@@ -47,7 +48,7 @@ pub async fn run_embedder(
         qdrant: qdrant.clone(),
         collection_name: build_collection_name(&job.repo_name),
         max_retries: config.pipeline.max_retries,
-        model: config.gemini.model.clone(),
+        model: config.active_model_name().to_string(),
         tx,
     });
 
@@ -72,10 +73,12 @@ pub async fn run_embedder(
                 batch_chunks.push(c);
 
                 // Flush batch if full
-                let current_limit = ctx.gemini.get_current_batch_max() as usize;
-                if batch_chunks.len() >= current_limit.min(batch_max_items)
-                    || batch_tokens >= max_tokens
-                {
+                let client = ctx.gemini.read().await;
+                let current_limit = client.get_current_batch_max() as usize;
+                drop(client);
+
+                let batch_max = current_limit.min(batch_max_items);
+                if batch_chunks.len() >= batch_max || batch_tokens >= max_tokens {
                     let batch = std::mem::take(&mut batch_chunks);
                     batch_tokens = 0;
 
@@ -160,12 +163,13 @@ async fn process_batch(
             })
             .collect();
 
-        match ctx
-            .gemini
+        let client = ctx.gemini.read().await;
+        match client
             .embed_batch(&inputs, "RETRIEVAL_DOCUMENT", ctx.max_retries)
             .await
         {
             Ok(embed_result) => {
+                drop(client);
                 for (chunk, embedding) in to_embed
                     .into_iter()
                     .zip(embed_result.embeddings.into_iter())
@@ -180,6 +184,7 @@ async fn process_batch(
                 }
             }
             Err(e) => {
+                drop(client);
                 error!(count = cache_misses, error = %e, "Embedding batch failed");
                 ctx.job
                     .counters

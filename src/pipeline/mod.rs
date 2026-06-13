@@ -13,13 +13,13 @@ pub mod parser;
 pub mod refresh;
 
 use crate::config::InxeConfig;
-use crate::gemini::client::GeminiClient;
+use crate::clients::embedder::EmbedderClient;
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::{IndexJob, JobStage};
 use crate::qdrant::client::InxeQdrantClient;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tracing::{error, info};
 
 /// Options for filtering and targeting the indexing pipeline.
@@ -34,7 +34,7 @@ pub struct PipelineOptions {
 /// Run the full indexing pipeline for a repository.
 pub async fn run_pipeline(
     config: Arc<InxeConfig>,
-    gemini: Arc<GeminiClient>,
+    embedder: Arc<RwLock<EmbedderClient>>,
     qdrant: Arc<InxeQdrantClient>,
     job: Arc<IndexJob>,
     options: PipelineOptions,
@@ -113,7 +113,7 @@ pub async fn run_pipeline(
     // Stage C: Embed Batcher
     let embed_job = Arc::clone(&job);
     let embed_config = Arc::clone(&config);
-    let embed_gemini = Arc::clone(&gemini);
+    let embed_gemini = Arc::clone(&embedder);
     let embed_qdrant = Arc::clone(&qdrant);
     let embed_handle = tokio::spawn(async move {
         embed_job.set_stage(JobStage::Embedding);

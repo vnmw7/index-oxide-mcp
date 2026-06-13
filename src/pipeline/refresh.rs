@@ -5,7 +5,7 @@
  */
 
 use crate::config::InxeConfig;
-use crate::gemini::client::GeminiClient;
+use crate::clients::embedder::EmbedderClient;
 use crate::models::search::RefreshResponse;
 use crate::pipeline::filters::{self, FilterResult};
 use crate::qdrant::client::InxeQdrantClient;
@@ -14,6 +14,7 @@ use ignore::WalkState;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 /// Run an incremental refresh for a repository.
@@ -22,7 +23,7 @@ pub async fn refresh_index(
     root_path: &Path,
     repo_name: &str,
     config: &Arc<InxeConfig>,
-    gemini: &Arc<GeminiClient>,
+    embedder: &Arc<RwLock<EmbedderClient>>,
     qdrant: &Arc<InxeQdrantClient>,
     include_globs: Option<Vec<String>>,
     exclude_globs: Option<Vec<String>>,
@@ -210,7 +211,7 @@ pub async fn refresh_index(
 
         crate::pipeline::run_pipeline(
             config.clone(),
-            gemini.clone(),
+            embedder.clone(),
             qdrant.clone(),
             job,
             crate::pipeline::PipelineOptions {
