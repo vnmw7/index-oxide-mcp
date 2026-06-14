@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: index-oxide-mcp/src/util/hashing.rs
+ * File URL: index-oxide-mcp/src/pipeline/hashing.rs
  * Purpose: Content hashing (BLAKE3) and deterministic UUID v5 generation for chunk IDs
  */
 

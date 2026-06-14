@@ -6,11 +6,11 @@
 
 use crate::config::InxeConfig;
 use crate::clients::embedder::EmbedderClient;
-use crate::gemini::client::EmbedInput;
+use crate::clients::EmbedInput;
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::IndexJob;
-use crate::qdrant::client::InxeQdrantClient;
-use crate::util::hashing::build_collection_name;
+use crate::clients::InxeQdrantClient;
+use crate::pipeline::hashing::build_collection_name;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;

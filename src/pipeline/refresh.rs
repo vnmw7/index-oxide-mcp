@@ -8,8 +8,8 @@ use crate::config::InxeConfig;
 use crate::clients::embedder::EmbedderClient;
 use crate::models::search::RefreshResponse;
 use crate::pipeline::filters::{self, FilterResult};
-use crate::qdrant::client::InxeQdrantClient;
-use crate::util::hashing::build_collection_name;
+use crate::clients::InxeQdrantClient;
+use crate::pipeline::hashing::build_collection_name;
 use ignore::WalkState;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -103,7 +103,7 @@ pub async fn refresh_index(
                         // Metadata matches, perform lazy hash check
                         match std::fs::read_to_string(path) {
                             Ok(content) => {
-                                let current_hash = crate::util::hashing::compute_content_hash(&content);
+                                let current_hash = crate::pipeline::hashing::compute_content_hash(&content);
                                 if &current_hash != indexed_hash {
                                     debug!(path = %relative_path, "Modified (lazy hash mismatch)");
                                     is_modified = true;

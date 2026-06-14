@@ -1,13 +1,13 @@
 /*
  * System: Index Oxide MCP
- * File URL: index-oxide-mcp/src/qdrant/client.rs
+ * File URL: index-oxide-mcp/src/clients/qdrant/client.rs
  * Purpose: Qdrant vector DB client wrapper for collection management, upsert, query, and delete
  */
 
 use crate::config::QdrantConfig;
 use crate::errors::StorageError;
 use crate::models::chunk::EmbeddedChunk;
-use crate::util::hashing::{build_collection_name, generate_chunk_id};
+use crate::pipeline::hashing::{build_collection_name, generate_chunk_id};
 use qdrant_client::qdrant::{
     Condition, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder, Distance, FieldType,
     Filter, HnswConfigDiffBuilder, PayloadIncludeSelector, PointStruct, PointsSelector,

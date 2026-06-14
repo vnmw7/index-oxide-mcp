@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/gemini/client.rs
+ * File URL: index-oxide-mcp/src/clients/gemini/client.rs
  * Purpose: Gemini embedding API client with adaptive batching, rate limiting, and multimodal support
  */
 

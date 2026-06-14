@@ -7,7 +7,7 @@
 use crate::config::InxeConfig;
 use crate::models::chunk::EmbeddedChunk;
 use crate::models::job::IndexJob;
-use crate::qdrant::client::InxeQdrantClient;
+use crate::clients::InxeQdrantClient;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;

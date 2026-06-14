@@ -6,8 +6,8 @@
  */
 
 use crate::errors::EmbeddingError;
-use crate::gemini::client::{BatchEmbedResult, EmbedInput, GeminiClient};
-use crate::ollama::client::OllamaClient;
+use crate::clients::{BatchEmbedResult, EmbedInput, GeminiClient};
+use crate::clients::OllamaClient;
 
 /// Unified client that delegates embedding requests to either Gemini or Ollama.
 pub enum EmbedderClient {

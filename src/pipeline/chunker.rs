@@ -5,8 +5,8 @@
  */
 
 use crate::models::chunk::CodeChunk;
-use crate::util::hashing::compute_content_hash;
-use crate::util::language::SupportedLanguage;
+use crate::pipeline::hashing::compute_content_hash;
+use crate::pipeline::language::SupportedLanguage;
 use tree_sitter::{Node, Tree};
 
 /// Metadata context for the file being processed.

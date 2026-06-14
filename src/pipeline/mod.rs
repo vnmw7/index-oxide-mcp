@@ -8,7 +8,9 @@ pub mod chunker;
 pub mod discovery;
 pub mod embedder;
 pub mod filters;
+pub mod hashing;
 pub mod indexer;
+pub mod language;
 pub mod parser;
 pub mod refresh;
 
@@ -16,7 +18,7 @@ use crate::config::InxeConfig;
 use crate::clients::embedder::EmbedderClient;
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::{IndexJob, JobStage};
-use crate::qdrant::client::InxeQdrantClient;
+use crate::clients::InxeQdrantClient;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};

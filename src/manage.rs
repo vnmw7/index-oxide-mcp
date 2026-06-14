@@ -10,8 +10,8 @@ use crate::clients::embedder::EmbedderClient;
 use crate::jobs::registry::JobRegistry;
 use crate::pipeline::{run_pipeline, PipelineOptions};
 use crate::models::job::IndexJob;
-use crate::qdrant::client::InxeQdrantClient;
-use crate::util::hashing::sanitize_repo_name;
+use crate::clients::InxeQdrantClient;
+use crate::pipeline::hashing::sanitize_repo_name;
 
 use crossterm::{
     event::{

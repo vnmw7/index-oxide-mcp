@@ -7,8 +7,8 @@
 use crate::clients::embedder::EmbedderClient;
 use crate::config::InxeConfig;
 use crate::models::search::{SearchRequest, SearchResponse, SearchResult};
-use crate::qdrant::client::InxeQdrantClient;
-use crate::util::hashing::build_collection_name;
+use crate::clients::InxeQdrantClient;
+use crate::pipeline::hashing::build_collection_name;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;

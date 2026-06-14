@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/gemini/mod.rs
+ * File URL: index-oxide-mcp/src/clients/gemini/mod.rs
  * Purpose: Re-export Gemini embedding client
  */
 

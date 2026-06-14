@@ -4,7 +4,7 @@
  * Purpose: Shared file discovery filtering and Walker configuration
  */
 
-use crate::util::language::{detect_language, is_binary_extension};
+use crate::pipeline::language::{detect_language, is_binary_extension};
 use ignore::{DirEntry, WalkBuilder};
 use std::path::Path;
 

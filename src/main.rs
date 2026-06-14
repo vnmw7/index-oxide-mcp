@@ -9,23 +9,19 @@ mod cli;
 mod clients;
 mod config;
 mod errors;
-mod gemini;
 mod jobs;
 mod manage;
 mod mcp_server;
 mod models;
-mod ollama;
 mod pipeline;
-mod qdrant;
 mod search;
-mod util;
 
 use crate::config::{ActiveEmbedder, InxeConfig};
 use crate::clients::embedder::EmbedderClient;
-use crate::gemini::client::GeminiClient;
+use crate::clients::GeminiClient;
 use crate::jobs::registry::JobRegistry;
 use crate::mcp_server::InxeServer;
-use crate::qdrant::client::InxeQdrantClient;
+use crate::clients::InxeQdrantClient;
 use axum::Router;
 use clap::Parser;
 use rmcp::transport::streamable_http_server::{
@@ -107,7 +103,7 @@ async fn main() -> anyhow::Result<()> {
             config.gemini.clone(),
             config.embedding.dimensions,
         )),
-        ActiveEmbedder::Ollama => EmbedderClient::Ollama(crate::ollama::client::OllamaClient::new(
+        ActiveEmbedder::Ollama => EmbedderClient::Ollama(crate::clients::OllamaClient::new(
             config.ollama.clone(),
         )),
     }));

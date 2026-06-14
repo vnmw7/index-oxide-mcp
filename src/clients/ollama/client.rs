@@ -1,13 +1,13 @@
 /*
  * System: Index Oxide MCP
  * Module: Ollama Client
- * File URL: index-oxide-mcp/src/ollama/client.rs
+ * File URL: index-oxide-mcp/src/clients/ollama/client.rs
  * Purpose: Ollama embedding API client with fast batching via /api/embed
  */
 
 use crate::config::OllamaConfig;
 use crate::errors::EmbeddingError;
-use crate::gemini::client::{BatchEmbedResult, EmbedInput};
+use crate::clients::{BatchEmbedResult, EmbedInput};
 use rand::RngExt;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};

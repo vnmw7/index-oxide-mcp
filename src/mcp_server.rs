@@ -8,7 +8,7 @@ use crate::config::InxeConfig;
 use crate::clients::embedder::EmbedderClient;
 use crate::jobs::registry::JobRegistry;
 use crate::models::search::SearchRequest;
-use crate::qdrant::client::InxeQdrantClient;
+use crate::clients::InxeQdrantClient;
 use crate::search::retriever;
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},

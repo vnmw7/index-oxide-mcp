@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/util/language.rs
+ * File URL: index-oxide-mcp/src/pipeline/language.rs
  * Purpose: File extension to programming language detection and supported language registry
  */
 

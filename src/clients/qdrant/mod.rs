@@ -1,6 +1,6 @@
 /*
  * System: Index Oxide MCP
- * File URL: oxidized-index-mcp/src/qdrant/mod.rs
+ * File URL: index-oxide-mcp/src/clients/qdrant/mod.rs
  * Purpose: Re-export Qdrant client module
  */
 
