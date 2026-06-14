@@ -260,6 +260,18 @@ impl InxeQdrantClient {
         Ok(())
     }
 
+    /// Drop an entire collection by its raw (already-prefixed) collection name.
+    /// Use `delete_collection` when you have a repo name; use this when you already
+    /// hold the collection name (e.g., from `list_inxe_collections`).
+    pub async fn delete_collection_by_name(&self, collection_name: &str) -> Result<(), StorageError> {
+        self.client
+            .delete_collection(collection_name)
+            .await
+            .map_err(|e| StorageError::DeleteFailed(e.to_string()))?;
+        info!(collection = %collection_name, "Collection deleted by name");
+        Ok(())
+    }
+
     /// List all collections matching the inxe_ prefix.
     pub async fn list_inxe_collections(&self) -> Result<Vec<String>, StorageError> {
         let collections = self

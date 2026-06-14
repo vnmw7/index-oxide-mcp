@@ -25,12 +25,13 @@ use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 use std::{io, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
-use tracing::error;
+use tracing::{error, info};
+use crate::models::job::JobStage;
 
 pub async fn run_tui(
     config: Arc<InxeConfig>,
@@ -76,6 +77,8 @@ struct App {
     input: String,
     messages: Vec<String>,
     collections: Vec<String>,
+    collections_state: ListState,
+    active_model: String,
     last_tick: std::time::Instant,
 }
 
@@ -86,6 +89,7 @@ impl App {
         qdrant: Arc<InxeQdrantClient>,
         jobs: Arc<JobRegistry>,
     ) -> App {
+        let active_model = config.active_model_name().to_string();
         App {
             config,
             embedder,
@@ -94,6 +98,8 @@ impl App {
             input: String::new(),
             messages: vec!["Welcome to Index Oxide MCP Manager. Press Ctrl+Q to quit.".to_string()],
             collections: Vec::new(),
+            collections_state: ListState::default(),
+            active_model,
             last_tick: std::time::Instant::now(),
         }
     }
@@ -139,6 +145,84 @@ impl App {
             }
         });
     }
+
+    fn next_collection(&mut self) {
+        let i = match self.collections_state.selected() {
+            Some(i) if i >= self.collections.len().saturating_sub(1) => 0,
+            Some(i) => i + 1,
+            None => 0,
+        };
+        self.collections_state.select(Some(i));
+    }
+
+    fn previous_collection(&mut self) {
+        let last = self.collections.len().saturating_sub(1);
+        let i = match self.collections_state.selected() {
+            Some(0) => last,
+            Some(i) => i - 1,
+            None => 0,
+        };
+        self.collections_state.select(Some(i));
+    }
+
+    async fn switch_model(&mut self) {
+        // Flag mixed-model / dimension-mismatch hazard during active indexing
+        let active = self.jobs.list_jobs().iter().any(|j| {
+            !matches!(j.stage, JobStage::Completed | JobStage::Failed | JobStage::Cancelled)
+        });
+        if active {
+            self.messages.push(
+                "Warning: switching model with active jobs may mix embedding models or break upserts.".into(),
+            );
+        }
+
+        let mut embedder = self.embedder.write().await;
+        match &*embedder {
+            EmbedderClient::Gemini(_) => {
+                *embedder = EmbedderClient::Ollama(crate::clients::OllamaClient::new(self.config.ollama.clone()));
+                self.active_model = self.config.ollama.model.clone();
+            }
+            EmbedderClient::Ollama(_) => {
+                *embedder = EmbedderClient::Gemini(crate::clients::GeminiClient::new(
+                    self.config.gemini.clone(),
+                    self.config.embedding.dimensions,
+                ));
+                self.active_model = self.config.gemini.model.clone();
+            }
+        }
+        drop(embedder);
+        self.messages.push(format!("Switched model to {}", self.active_model));
+    }
+
+    async fn delete_selected_collection(&mut self) {
+        let Some(i) = self.collections_state.selected() else { return };
+        let Some(col) = self.collections.get(i).cloned() else { return };
+
+        // Map prefixed collection name -> sanitized repo name for job matching
+        let repo_name = col.strip_prefix("inxe_").unwrap_or(&col).to_string();
+
+        // Cancel active jobs targeting this repo (synchronous flag-set; pipeline checks per-batch)
+        for job in self.jobs.list_jobs() {
+            let is_active = !matches!(job.stage, JobStage::Completed | JobStage::Failed | JobStage::Cancelled);
+            if is_active && job.repo_name == repo_name {
+                self.jobs.cancel_job(&job.job_id);
+                self.messages.push(format!("Cancelled active job {} ({})", job.job_id, repo_name));
+            }
+        }
+
+        // Optimistic UI: clear selection + immediate confirmation (non-blocking)
+        self.collections_state.select(None);
+        self.messages.push(format!("Queued deletion of {}", col));
+
+        // Off-thread delete; UI reflects new state on next refresh tick
+        let qdrant = Arc::clone(&self.qdrant);
+        tokio::spawn(async move {
+            match qdrant.delete_collection_by_name(&col).await {
+                Ok(_) => info!(collection = %col, "Collection deleted"),
+                Err(e) => error!(collection = %col, error = %e, "Failed to delete collection"),
+            }
+        });
+    }
 }
 
 async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> anyhow::Result<()> {
@@ -169,7 +253,12 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> anyho
                                 }
                                 KeyCode::Esc => {
                                     app.input.clear();
+                                    app.collections_state.select(None);
                                 }
+                                KeyCode::Down => app.next_collection(),
+                                KeyCode::Up => app.previous_collection(),
+                                KeyCode::Delete => app.delete_selected_collection().await,
+                                KeyCode::Tab => app.switch_model().await,
                                 _ => {}
                             }
                         }
@@ -189,7 +278,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> anyho
     }
 }
 
-fn ui(f: &mut Frame, app: &App) {
+fn ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
@@ -203,13 +292,15 @@ fn ui(f: &mut Frame, app: &App) {
         )
         .split(f.size());
 
-    // Input area
+    let title = format!(
+        "Index New Directory | Active: {} | [Tab] Swap | [Del] Delete | [↑/↓] Select",
+        app.active_model
+    );
     let input = Paragraph::new(app.input.as_str())
         .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Index New Directory (Enter Path)"));
+        .block(Block::default().borders(Borders::ALL).title(title));
     f.render_widget(input, chunks[0]);
 
-    // Main area: Collections and Jobs
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
@@ -222,11 +313,10 @@ fn ui(f: &mut Frame, app: &App) {
         .collect();
     let collections_list = List::new(collections)
         .block(Block::default().borders(Borders::ALL).title("Indexed Repositories"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(">>");
-    f.render_widget(collections_list, main_chunks[0]);
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Cyan))
+        .highlight_symbol(">> ");
+    f.render_stateful_widget(collections_list, main_chunks[0], &mut app.collections_state);
 
-    // Active Jobs status
     let active_jobs = app.jobs.list_jobs();
     let jobs_items: Vec<ListItem> = active_jobs
         .iter()
@@ -241,7 +331,6 @@ fn ui(f: &mut Frame, app: &App) {
         .block(Block::default().borders(Borders::ALL).title("Index Jobs Status"));
     f.render_widget(jobs_list, main_chunks[1]);
 
-    // Messages / Log area
     let messages: Vec<ListItem> = app
         .messages
         .iter()
