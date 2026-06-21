@@ -14,14 +14,14 @@ pub mod language;
 pub mod parser;
 pub mod refresh;
 
-use crate::config::InxeConfig;
+use crate::clients::InxeQdrantClient;
 use crate::clients::embedder::EmbedderClient;
+use crate::config::InxeConfig;
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::{IndexJob, JobStage};
-use crate::clients::InxeQdrantClient;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tracing::{error, info};
 
 /// Options for filtering and targeting the indexing pipeline.

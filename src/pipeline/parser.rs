@@ -7,10 +7,10 @@
 use crate::models::chunk::CodeChunk;
 use crate::models::job::IndexJob;
 use crate::pipeline::chunker;
-use crate::pipeline::language::{detect_language, is_language_allowed, SupportedLanguage};
+use crate::pipeline::language::{SupportedLanguage, detect_language, is_language_allowed};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 use tree_sitter::Parser;

@@ -4,10 +4,10 @@
  * Purpose: Hybrid code retrieval with vector search, filtering, and deterministic reranking
  */
 
+use crate::clients::InxeQdrantClient;
 use crate::clients::embedder::EmbedderClient;
 use crate::config::InxeConfig;
 use crate::models::search::{SearchRequest, SearchResponse, SearchResult};
-use crate::clients::InxeQdrantClient;
 use crate::pipeline::hashing::build_collection_name;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -98,10 +98,10 @@ pub async fn search_codebase(
             }
 
             // Slight boost for same-language match if language filter is specified
-            if let Some(ref lang_filter) = request.language {
-                if language.eq_ignore_ascii_case(lang_filter) {
-                    adjusted_score += 0.02;
-                }
+            if let Some(ref lang_filter) = request.language
+                && language.eq_ignore_ascii_case(lang_filter)
+            {
+                adjusted_score += 0.02;
             }
 
             SearchResult {

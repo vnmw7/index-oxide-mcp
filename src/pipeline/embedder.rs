@@ -4,18 +4,18 @@
  * Purpose: Stage C - Adaptive batch embedding via Gemini API with concurrency control and caching
  */
 
-use crate::config::InxeConfig;
-use crate::clients::embedder::EmbedderClient;
 use crate::clients::EmbedInput;
+use crate::clients::InxeQdrantClient;
+use crate::clients::embedder::EmbedderClient;
+use crate::config::InxeConfig;
 use crate::models::chunk::{CodeChunk, EmbeddedChunk};
 use crate::models::job::IndexJob;
-use crate::clients::InxeQdrantClient;
 use crate::pipeline::hashing::build_collection_name;
 use chrono::Utc;
 use std::collections::HashMap;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock, Semaphore};
+use std::sync::atomic::Ordering;
+use tokio::sync::{RwLock, Semaphore, mpsc};
 use tracing::{debug, error, warn};
 
 /// Context for batch embedding tasks, shared across concurrent executions.
@@ -170,10 +170,7 @@ async fn process_batch(
         {
             Ok(embed_result) => {
                 drop(client);
-                for (chunk, embedding) in to_embed
-                    .into_iter()
-                    .zip(embed_result.embeddings.into_iter())
-                {
+                for (chunk, embedding) in to_embed.into_iter().zip(embed_result.embeddings) {
                     results.push(EmbeddedChunk {
                         chunk,
                         embedding,

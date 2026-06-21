@@ -26,7 +26,7 @@ pub enum Commands {
         #[arg(long, default_value = "stdio")]
         transport: TransportMode,
     },
-    /// Open the interactive TUI to manage indexes and projects.
+    /// Open the interactive slash-command TUI to manage indexes and projects.
     Manage,
 }
 

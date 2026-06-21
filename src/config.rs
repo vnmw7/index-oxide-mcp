@@ -80,7 +80,11 @@ impl InxeConfig {
         let api_key = env::var("GEMINI_API_KEY")
             .map_err(|_| anyhow::anyhow!("GEMINI_API_KEY environment variable is required"))?;
 
-        let active_embedder = match env::var("ACTIVE_EMBEDDER").unwrap_or_else(|_| "gemini".to_string()).to_lowercase().as_str() {
+        let active_embedder = match env::var("ACTIVE_EMBEDDER")
+            .unwrap_or_else(|_| "gemini".to_string())
+            .to_lowercase()
+            .as_str()
+        {
             "ollama" => ActiveEmbedder::Ollama,
             _ => ActiveEmbedder::Gemini,
         };
@@ -105,8 +109,10 @@ impl InxeConfig {
                 }),
             },
             ollama: OllamaConfig {
-                base_url: env::var("OLLAMA_BASE_URL").unwrap_or_else(|_| "http://localhost:11434".to_string()),
-                model: env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen3-embedding:4b-fp16".to_string()),
+                base_url: env::var("OLLAMA_BASE_URL")
+                    .unwrap_or_else(|_| "http://localhost:11434".to_string()),
+                model: env::var("OLLAMA_MODEL")
+                    .unwrap_or_else(|_| "qwen3-embedding:4b-fp16".to_string()),
             },
             qdrant: QdrantConfig {
                 url: env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6334".to_string()),

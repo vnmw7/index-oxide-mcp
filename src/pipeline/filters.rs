@@ -97,10 +97,10 @@ impl FileFilter {
         let path = entry.path();
 
         if path.is_dir() {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if SKIP_DIRS.contains(&name) {
-                    return FilterResult::SkipDir;
-                }
+            if let Some(name) = path.file_name().and_then(|n| n.to_str())
+                && SKIP_DIRS.contains(&name)
+            {
+                return FilterResult::SkipDir;
             }
             return FilterResult::Ignore;
         }

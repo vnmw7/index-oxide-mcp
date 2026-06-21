@@ -4,14 +4,14 @@
  * Purpose: Stage D - Batch upsert embedded chunks into Qdrant with retry and backpressure
  */
 
+use crate::clients::InxeQdrantClient;
 use crate::config::InxeConfig;
 use crate::models::chunk::EmbeddedChunk;
 use crate::models::job::IndexJob;
-use crate::clients::InxeQdrantClient;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{Semaphore, mpsc};
 use tokio::task::JoinSet;
 use tracing::{debug, error, warn};
 

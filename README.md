@@ -136,7 +136,7 @@ Default Streamable HTTP endpoints:
 
 ### Open CLI: `manage` Interactive TUI
 
-Use `manage` when you want a terminal UI for index operations instead of connecting through an MCP client. The TUI uses the same `GEMINI_API_KEY`, `QDRANT_URL`, and embedding configuration as the MCP server.
+Use `manage` when you want a slash-command terminal UI for index operations instead of connecting through an MCP client. The TUI uses the same `GEMINI_API_KEY`, `QDRANT_URL`, and embedding configuration as the MCP server.
 
 Windows PowerShell:
 
@@ -144,7 +144,28 @@ Windows PowerShell:
 .\index-oxide-mcp.exe --api-key "your_api_key_here" manage 
 ```
 
-In the TUI, enter a repository path and press `Enter` to start indexing it. Press `q` to quit.
+In the TUI, type `/help` to show the available commands. Entering a repository path without a slash still starts an index job for compatibility.
+
+Core commands:
+
+- `/index <path>`: start indexing a repository path. Quote paths that contain spaces.
+- `/refresh`: reload indexed repositories from Qdrant.
+- `/delete` or `/delete selected`: request deletion of the selected collection.
+- `/delete <collection>`: request deletion of a named collection.
+- `/confirm`: confirm a pending deletion.
+- `/cancel`: cancel a pending deletion or clear command state.
+- `/model`: toggle between configured Gemini and Ollama embedders.
+- `/model gemini` or `/model ollama`: switch to a specific embedder.
+- `/clear`: clear the log panel.
+- `/quit`: exit the TUI.
+
+Keyboard shortcuts:
+
+- `Up` / `Down`: select an indexed repository.
+- `Delete`: request deletion of the selected repository when the command input is empty.
+- `Tab`: toggle the active embedder when the command input is empty.
+- `Ctrl+Q`: quit.
+- `Esc`: clear input, cancel a pending deletion, or clear repository selection.
 
 ## Testing and Debugging with MCP Inspector
 

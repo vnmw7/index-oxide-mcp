@@ -9,8 +9,8 @@ use crate::models::job::IndexJob;
 use crate::pipeline::filters::{self, FilterResult};
 use ignore::WalkState;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 

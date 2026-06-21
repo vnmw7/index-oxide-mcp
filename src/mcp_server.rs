@@ -4,16 +4,17 @@
  * Purpose: MCP server for searching in indexed codebases (Dual-mode Streamable HTTP/Stdio)
  */
 
-use crate::config::InxeConfig;
+use crate::clients::InxeQdrantClient;
 use crate::clients::embedder::EmbedderClient;
+use crate::config::InxeConfig;
 use crate::jobs::registry::JobRegistry;
 use crate::models::search::SearchRequest;
-use crate::clients::InxeQdrantClient;
 use crate::search::retriever;
 use rmcp::{
+    ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router, ServerHandler,
+    tool, tool_handler, tool_router,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -63,7 +64,8 @@ impl InxeServer {
     pub async fn search_codebase(&self, Parameters(request): Parameters<SearchRequest>) -> String {
         info!(query = %request.query, "search_codebase called");
 
-        match retriever::search_codebase(&request, &self.embedder, &self.qdrant, &self.config).await {
+        match retriever::search_codebase(&request, &self.embedder, &self.qdrant, &self.config).await
+        {
             Ok(response) => serde_json::to_string_pretty(&response)
                 .unwrap_or_else(|e| serde_json::json!({"error": e.to_string()}).to_string()),
             Err(e) => {

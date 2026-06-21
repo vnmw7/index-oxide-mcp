@@ -265,12 +265,11 @@ fn extract_symbol_name(node: &Node, source: &str, language: SupportedLanguage) -
     }
 
     // For decorated definitions in Python, look at the inner definition
-    if node.kind() == "decorated_definition" {
-        if let Some(def) = find_child_by_kind(node, "function_definition")
+    if node.kind() == "decorated_definition"
+        && let Some(def) = find_child_by_kind(node, "function_definition")
             .or_else(|| find_child_by_kind(node, "class_definition"))
-        {
-            return extract_symbol_name(&def, source, language);
-        }
+    {
+        return extract_symbol_name(&def, source, language);
     }
 
     // For export statements in TS, look at the exported declaration
@@ -535,10 +534,8 @@ fn find_child_by_field_name<'a>(node: &'a Node<'a>, field: &str) -> Option<Node<
 
 fn find_child_by_kind<'a>(node: &'a Node<'a>, kind: &str) -> Option<Node<'a>> {
     let mut cursor = node.walk();
-    let result = node
-        .children(&mut cursor)
-        .find(|child| child.kind() == kind);
-    result
+    node.children(&mut cursor)
+        .find(|child| child.kind() == kind)
 }
 
 fn extract_file_stem(path: &str) -> String {

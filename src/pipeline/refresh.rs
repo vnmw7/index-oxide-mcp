@@ -4,11 +4,11 @@
  * Purpose: Incremental refresh - detect changed/deleted files and selectively re-index
  */
 
-use crate::config::InxeConfig;
+use crate::clients::InxeQdrantClient;
 use crate::clients::embedder::EmbedderClient;
+use crate::config::InxeConfig;
 use crate::models::search::RefreshResponse;
 use crate::pipeline::filters::{self, FilterResult};
-use crate::clients::InxeQdrantClient;
 use crate::pipeline::hashing::build_collection_name;
 use ignore::WalkState;
 use std::collections::HashMap;
@@ -31,7 +31,8 @@ pub async fn refresh_index(
     let collection_name = build_collection_name(repo_name);
 
     // Get all currently indexed paths and their metadata
-    let indexed_metadata: HashMap<String, (String, u64, String)> = qdrant.get_indexed_metadata(&collection_name).await?;
+    let indexed_metadata: HashMap<String, (String, u64, String)> =
+        qdrant.get_indexed_metadata(&collection_name).await?;
     info!(
         indexed_count = indexed_metadata.len(),
         "Loaded indexed file metadata for refresh"

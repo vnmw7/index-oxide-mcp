@@ -5,9 +5,9 @@
  * Purpose: Ollama embedding API client with fast batching via /api/embed
  */
 
+use crate::clients::{BatchEmbedResult, EmbedInput};
 use crate::config::OllamaConfig;
 use crate::errors::EmbeddingError;
-use crate::clients::{BatchEmbedResult, EmbedInput};
 use rand::RngExt;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};

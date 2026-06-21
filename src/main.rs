@@ -16,18 +16,18 @@ mod models;
 mod pipeline;
 mod search;
 
-use crate::config::{ActiveEmbedder, InxeConfig};
-use crate::clients::embedder::EmbedderClient;
 use crate::clients::GeminiClient;
+use crate::clients::InxeQdrantClient;
+use crate::clients::embedder::EmbedderClient;
+use crate::config::{ActiveEmbedder, InxeConfig};
 use crate::jobs::registry::JobRegistry;
 use crate::mcp_server::InxeServer;
-use crate::clients::InxeQdrantClient;
 use axum::Router;
 use clap::Parser;
-use rmcp::transport::streamable_http_server::{
-    session::local::LocalSessionManager, StreamableHttpService,
-};
 use rmcp::ServiceExt;
+use rmcp::transport::streamable_http_server::{
+    StreamableHttpService, session::local::LocalSessionManager,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -103,9 +103,9 @@ async fn main() -> anyhow::Result<()> {
             config.gemini.clone(),
             config.embedding.dimensions,
         )),
-        ActiveEmbedder::Ollama => EmbedderClient::Ollama(crate::clients::OllamaClient::new(
-            config.ollama.clone(),
-        )),
+        ActiveEmbedder::Ollama => {
+            EmbedderClient::Ollama(crate::clients::OllamaClient::new(config.ollama.clone()))
+        }
     }));
 
     // Initialize Qdrant client

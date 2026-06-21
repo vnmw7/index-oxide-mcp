@@ -8,12 +8,12 @@ use crate::config::QdrantConfig;
 use crate::errors::StorageError;
 use crate::models::chunk::EmbeddedChunk;
 use crate::pipeline::hashing::{build_collection_name, generate_chunk_id};
+use qdrant_client::Qdrant;
 use qdrant_client::qdrant::{
     Condition, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder, Distance, FieldType,
     Filter, HnswConfigDiffBuilder, PayloadIncludeSelector, PointStruct, PointsSelector,
     QueryPointsBuilder, ScrollPointsBuilder, UpsertPointsBuilder, VectorParamsBuilder,
 };
-use qdrant_client::Qdrant;
 use serde_json::json;
 use tracing::{debug, info, warn};
 
@@ -263,7 +263,10 @@ impl InxeQdrantClient {
     /// Drop an entire collection by its raw (already-prefixed) collection name.
     /// Use `delete_collection` when you have a repo name; use this when you already
     /// hold the collection name (e.g., from `list_inxe_collections`).
-    pub async fn delete_collection_by_name(&self, collection_name: &str) -> Result<(), StorageError> {
+    pub async fn delete_collection_by_name(
+        &self,
+        collection_name: &str,
+    ) -> Result<(), StorageError> {
         self.client
             .delete_collection(collection_name)
             .await
@@ -325,17 +328,15 @@ impl InxeQdrantClient {
                     payload.get("file_mtime"),
                     payload.get("file_size"),
                     payload.get("file_hash"),
-                ) {
-                    if let (Some(path), Some(mtime), Some(hash)) =
-                        (path_val.as_str(), mtime_val.as_str(), hash_val.as_str())
-                    {
-                        let size = size_val.as_integer().unwrap_or(0) as u64;
-                        // Use the last seen one (this is now the file-level hash, so it's consistent)
-                        result.insert(
-                            path.to_string(),
-                            (mtime.to_string(), size, hash.to_string()),
-                        );
-                    }
+                ) && let (Some(path), Some(mtime), Some(hash)) =
+                    (path_val.as_str(), mtime_val.as_str(), hash_val.as_str())
+                {
+                    let size = size_val.as_integer().unwrap_or(0) as u64;
+                    // Use the last seen one (this is now the file-level hash, so it's consistent)
+                    result.insert(
+                        path.to_string(),
+                        (mtime.to_string(), size, hash.to_string()),
+                    );
                 }
             }
 
@@ -379,23 +380,29 @@ impl InxeQdrantClient {
 
         let mut result = std::collections::HashMap::new();
         for point in response.result {
-            if let Some(hash_val) = point.payload.get("content_hash") {
-                if let Some(hash) = hash_val.as_str() {
-                    if let Some(vectors) = point.vectors {
-                        if let Some(
-                            qdrant_client::qdrant::vectors_output::VectorsOptions::Vector(v),
-                        ) = vectors.vectors_options
-                        {
-                            match v.into_vector() {
-                                qdrant_client::qdrant::vector_output::Vector::Dense(dense) => {
-                                    result.insert(hash.to_string(), dense.data);
-                                }
-                                _ => {
-                                    debug!(hash = %hash, "Ignored non-dense vector during cache hydration");
-                                }
-                            }
-                        }
-                    }
+            let Some(hash) = point
+                .payload
+                .get("content_hash")
+                .and_then(|hash_val| hash_val.as_str())
+                .cloned()
+            else {
+                continue;
+            };
+            let Some(vectors) = point.vectors else {
+                continue;
+            };
+            let Some(qdrant_client::qdrant::vectors_output::VectorsOptions::Vector(v)) =
+                vectors.vectors_options
+            else {
+                continue;
+            };
+
+            match v.into_vector() {
+                qdrant_client::qdrant::vector_output::Vector::Dense(dense) => {
+                    result.insert(hash, dense.data);
+                }
+                _ => {
+                    debug!(hash = %hash, "Ignored non-dense vector during cache hydration");
                 }
             }
         }

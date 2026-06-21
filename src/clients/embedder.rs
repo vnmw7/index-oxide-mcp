@@ -5,9 +5,9 @@
  * Purpose: Unified embedder client abstraction over Gemini and Ollama
  */
 
-use crate::errors::EmbeddingError;
-use crate::clients::{BatchEmbedResult, EmbedInput, GeminiClient};
 use crate::clients::OllamaClient;
+use crate::clients::{BatchEmbedResult, EmbedInput, GeminiClient};
+use crate::errors::EmbeddingError;
 
 /// Unified client that delegates embedding requests to either Gemini or Ollama.
 pub enum EmbedderClient {
